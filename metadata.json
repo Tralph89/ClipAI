@@ -1,0 +1,8 @@
+{
+  "name": "ClipAI - Generador de Shorts con IA",
+  "description": "Plataforma multi-canal de inteligencia de tendencias en vivo, generación híbrida de video con IA y publicación para redes sociales.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
