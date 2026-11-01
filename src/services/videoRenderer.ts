@@ -139,12 +139,27 @@ async function loadImageElement(src: string): Promise<HTMLImageElement> {
   });
 }
 
+async function loadVideoElement(src: string): Promise<HTMLVideoElement> {
+  return new Promise((resolve, reject) => {
+    const vid = document.createElement('video');
+    vid.crossOrigin = 'anonymous';
+    vid.muted = true;
+    vid.loop = true;
+    vid.playsInline = true;
+    vid.preload = 'auto';
+    vid.onloadeddata = () => resolve(vid);
+    vid.onerror = (err) => reject(err);
+    vid.src = src;
+    vid.load();
+  });
+}
+
 export function drawSceneFrameOnCanvas(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
   canvasHeight: number,
   scene: Scene,
-  imageElement: HTMLImageElement | null,
+  mediaElement: HTMLImageElement | HTMLVideoElement | null,
   sceneProgress: number, // 0 to 1
   subtitleStyle: SubtitleStyleType = 'hormozi',
   channelWatermark?: string
@@ -153,27 +168,39 @@ export function drawSceneFrameOnCanvas(
   ctx.fillStyle = '#090A0F';
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
+  const isVideoClip =
+    typeof HTMLVideoElement !== 'undefined' && mediaElement instanceof HTMLVideoElement;
+
   const motion: CameraMotionType = scene.cameraMotion || 'zoom_in';
-  let scale = 1.08;
+  let scale = isVideoClip ? 1.02 : 1.08;
   let offsetX = 0;
   let offsetY = 0;
 
-  if (motion === 'zoom_in') {
-    scale = 1.0 + sceneProgress * 0.16;
-  } else if (motion === 'zoom_out') {
-    scale = 1.18 - sceneProgress * 0.16;
-  } else if (motion === 'pan_right') {
-    scale = 1.15;
-    offsetX = (sceneProgress - 0.5) * canvasWidth * 0.1;
-  } else if (motion === 'pan_left') {
-    scale = 1.15;
-    offsetX = (0.5 - sceneProgress) * canvasWidth * 0.1;
-  } else if (motion === 'pulse') {
-    scale = 1.06 + Math.sin(sceneProgress * Math.PI * 2) * 0.05;
+  if (!isVideoClip) {
+    if (motion === 'zoom_in') {
+      scale = 1.0 + sceneProgress * 0.16;
+    } else if (motion === 'zoom_out') {
+      scale = 1.18 - sceneProgress * 0.16;
+    } else if (motion === 'pan_right') {
+      scale = 1.15;
+      offsetX = (sceneProgress - 0.5) * canvasWidth * 0.1;
+    } else if (motion === 'pan_left') {
+      scale = 1.15;
+      offsetX = (0.5 - sceneProgress) * canvasWidth * 0.1;
+    } else if (motion === 'pulse') {
+      scale = 1.06 + Math.sin(sceneProgress * Math.PI * 2) * 0.05;
+    }
   }
 
-  if (imageElement) {
-    const imgRatio = imageElement.width / imageElement.height;
+  if (mediaElement) {
+    const sourceW = isVideoClip
+      ? mediaElement.videoWidth || canvasWidth
+      : (mediaElement as HTMLImageElement).width || canvasWidth;
+    const sourceH = isVideoClip
+      ? mediaElement.videoHeight || canvasHeight
+      : (mediaElement as HTMLImageElement).height || canvasHeight;
+
+    const imgRatio = sourceW / Math.max(1, sourceH);
     const canvasRatio = canvasWidth / canvasHeight;
     let drawW = canvasWidth;
     let drawH = canvasHeight;
@@ -188,7 +215,7 @@ export function drawSceneFrameOnCanvas(
 
     ctx.translate(canvasWidth / 2 + offsetX, canvasHeight / 2 + offsetY);
     ctx.scale(scale, scale);
-    ctx.drawImage(imageElement, -drawW / 2, -drawH / 2, drawW, drawH);
+    ctx.drawImage(mediaElement, -drawW / 2, -drawH / 2, drawW, drawH);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   } else {
     // Stylized gradient backdrop if scene has no image yet
@@ -216,19 +243,35 @@ export function drawSceneFrameOnCanvas(
     ctx.fillText(channelWatermark, canvasWidth * 0.05, canvasHeight * 0.06);
   }
 
-  // Dynamic Word-Chunked Subtitles
+  // Dynamic Word-Chunked Subtitles (Synced to real `scene.wordTimings` when available)
   const dialogue = (scene.dialogue || '').trim();
   if (dialogue) {
-    const words = dialogue.split(/\s+/);
+    const words =
+      scene.wordTimings && scene.wordTimings.length > 0
+        ? scene.wordTimings.map((wt) => wt.word)
+        : dialogue.split(/\s+/);
     const chunkSize = 5;
     const totalChunks = Math.max(1, Math.ceil(words.length / chunkSize));
-    const activeChunkIndex = Math.min(totalChunks - 1, Math.floor(sceneProgress * totalChunks));
+
+    let globalWordIndex = Math.min(words.length - 1, Math.floor(sceneProgress * words.length));
+    if (scene.wordTimings && scene.wordTimings.length > 0 && scene.durationSec) {
+      const localSec = sceneProgress * scene.durationSec;
+      const foundIdx = scene.wordTimings.findIndex(
+        (wt, idx) =>
+          localSec >= wt.startSec &&
+          (localSec <= wt.endSec || idx === scene.wordTimings!.length - 1)
+      );
+      if (foundIdx >= 0) {
+        globalWordIndex = foundIdx;
+      }
+    }
+
+    const activeChunkIndex = Math.min(totalChunks - 1, Math.floor(globalWordIndex / chunkSize));
     const chunkWords = words.slice(
       activeChunkIndex * chunkSize,
       activeChunkIndex * chunkSize + chunkSize
     );
-    const localProgress = (sceneProgress * totalChunks) % 1;
-    const activeWordIdx = Math.floor(localProgress * chunkWords.length);
+    const activeWordIdx = globalWordIndex - activeChunkIndex * chunkSize;
 
     const fontSize = Math.max(22, Math.round(canvasWidth * (canvasWidth > canvasHeight ? 0.042 : 0.062)));
     ctx.font = `800 ${fontSize}px "Plus Jakarta Sans", sans-serif`;
@@ -297,6 +340,7 @@ export async function renderRealVideoInBrowser(options: {
   aspectRatio: AspectRatioType;
   voiceAudioUrl?: string;
   musicAudioUrl?: string;
+  mixedAudioUrl?: string;
   subtitleStyle?: SubtitleStyleType;
   channelWatermark?: string;
   onProgress?: (percent: number) => void;
@@ -306,6 +350,7 @@ export async function renderRealVideoInBrowser(options: {
     aspectRatio,
     voiceAudioUrl,
     musicAudioUrl,
+    mixedAudioUrl,
     subtitleStyle = 'hormozi',
     channelWatermark,
     onProgress,
@@ -322,17 +367,30 @@ export async function renderRealVideoInBrowser(options: {
     throw new Error('No se pudo inicializar el motor gráfico Canvas 2D.');
   }
 
-  // Preload all scene images
-  const loadedImages: Array<HTMLImageElement | null> = await Promise.all(
-    scenes.map(async (s) => {
-      if (!s.imageUrl) return null;
-      try {
-        return await loadImageElement(s.imageUrl);
-      } catch {
-        return null;
-      }
-    })
-  );
+  // Preload all scene B-Roll videos (if present) and static images
+  const [loadedVideos, loadedImages] = await Promise.all([
+    Promise.all(
+      scenes.map(async (s) => {
+        const clipSrc = s.videoClipUrl || s.animatedUrl;
+        if (!clipSrc) return null;
+        try {
+          return await loadVideoElement(clipSrc);
+        } catch {
+          return null;
+        }
+      })
+    ),
+    Promise.all(
+      scenes.map(async (s) => {
+        if (!s.imageUrl) return null;
+        try {
+          return await loadImageElement(s.imageUrl);
+        } catch {
+          return null;
+        }
+      })
+    ),
+  ]);
 
   const audioCtx = new AudioContext();
   const destNode = audioCtx.createMediaStreamDestination();
@@ -350,31 +408,40 @@ export async function renderRealVideoInBrowser(options: {
     }
   };
 
-  const [voiceBuffer, musicBuffer] = await Promise.all([
-    decodeAudioUrl(voiceAudioUrl),
-    decodeAudioUrl(musicAudioUrl),
+  const [mixedBuffer, voiceBuffer, musicBuffer] = await Promise.all([
+    decodeAudioUrl(mixedAudioUrl),
+    mixedAudioUrl ? Promise.resolve(null) : decodeAudioUrl(voiceAudioUrl),
+    mixedAudioUrl ? Promise.resolve(null) : decodeAudioUrl(musicAudioUrl),
   ]);
 
-  if (voiceBuffer) {
-    totalDurationSec = Math.max(6, Math.min(45, voiceBuffer.duration + 0.8));
-    const voiceSource = audioCtx.createBufferSource();
-    voiceSource.buffer = voiceBuffer;
-    const voiceGain = audioCtx.createGain();
-    voiceGain.gain.value = 1.0;
-    voiceSource.connect(voiceGain);
-    voiceGain.connect(destNode);
-    voiceSource.start(0);
-  }
+  if (mixedBuffer) {
+    totalDurationSec = Math.max(4, mixedBuffer.duration);
+    const mixSource = audioCtx.createBufferSource();
+    mixSource.buffer = mixedBuffer;
+    mixSource.connect(destNode);
+    mixSource.start(0);
+  } else {
+    if (voiceBuffer) {
+      totalDurationSec = Math.max(4, voiceBuffer.duration + 0.8);
+      const voiceSource = audioCtx.createBufferSource();
+      voiceSource.buffer = voiceBuffer;
+      const voiceGain = audioCtx.createGain();
+      voiceGain.gain.value = 1.0;
+      voiceSource.connect(voiceGain);
+      voiceGain.connect(destNode);
+      voiceSource.start(0);
+    }
 
-  if (musicBuffer) {
-    const musicSource = audioCtx.createBufferSource();
-    musicSource.buffer = musicBuffer;
-    musicSource.loop = true;
-    const musicGain = audioCtx.createGain();
-    musicGain.gain.value = voiceBuffer ? 0.22 : 0.65;
-    musicSource.connect(musicGain);
-    musicGain.connect(destNode);
-    musicSource.start(0);
+    if (musicBuffer) {
+      const musicSource = audioCtx.createBufferSource();
+      musicSource.buffer = musicBuffer;
+      musicSource.loop = true;
+      const musicGain = audioCtx.createGain();
+      musicGain.gain.value = voiceBuffer ? 0.22 : 0.65;
+      musicSource.connect(musicGain);
+      musicGain.connect(destNode);
+      musicSource.start(0);
+    }
   }
 
   const canvasStream = canvas.captureStream(30);
@@ -404,13 +471,28 @@ export async function renderRealVideoInBrowser(options: {
     }
   };
 
+  const cleanupVideos = () => {
+    loadedVideos.forEach((v) => {
+      if (v) {
+        try {
+          v.pause();
+          v.removeAttribute('src');
+        } catch {
+          // ignore
+        }
+      }
+    });
+  };
+
   return new Promise((resolve, reject) => {
     recorder.onerror = (err) => {
+      cleanupVideos();
       audioCtx.close().catch(() => {});
       reject(err);
     };
 
     recorder.onstop = () => {
+      cleanupVideos();
       audioCtx.close().catch(() => {});
       const blob = new Blob(chunks, { type: supportedMime || 'video/webm' });
       const videoUrl = URL.createObjectURL(blob);
@@ -421,22 +503,57 @@ export async function renderRealVideoInBrowser(options: {
     const startTime = performance.now();
     const durationMs = totalDurationSec * 1000;
     const sceneCount = Math.max(1, scenes.length);
+    let activePlayingVideoIdx = -1;
 
     const renderLoop = () => {
       const elapsed = performance.now() - startTime;
       const overallProgress = Math.min(1, elapsed / durationMs);
       onProgress?.(Math.round(overallProgress * 100));
 
-      const rawSceneFloat = overallProgress * sceneCount;
-      const sceneIndex = Math.min(sceneCount - 1, Math.floor(rawSceneFloat));
-      const sceneProgress = rawSceneFloat - sceneIndex;
+      const elapsedSec = elapsed / 1000;
+      let sceneIndex = Math.min(sceneCount - 1, Math.floor(overallProgress * sceneCount));
+      let sceneProgress = overallProgress * sceneCount - sceneIndex;
+
+      if (scenes.some((s) => typeof s.durationSec === 'number' && s.durationSec > 0)) {
+        let cursor = 0;
+        for (let i = 0; i < scenes.length; i++) {
+          const sDur = scenes[i].durationSec || 4;
+          const sStart = typeof scenes[i].startSec === 'number' ? scenes[i].startSec! : cursor;
+          const sEnd = sStart + sDur;
+          if (elapsedSec <= sEnd + 0.14 || i === scenes.length - 1) {
+            sceneIndex = i;
+            sceneProgress = Math.max(0, Math.min(1, (elapsedSec - sStart) / Math.max(0.2, sDur)));
+            break;
+          }
+          cursor = sEnd + 0.14;
+        }
+      }
+
+      if (sceneIndex !== activePlayingVideoIdx) {
+        if (activePlayingVideoIdx >= 0 && loadedVideos[activePlayingVideoIdx]) {
+          loadedVideos[activePlayingVideoIdx]?.pause();
+        }
+        activePlayingVideoIdx = sceneIndex;
+        const nextVid = loadedVideos[sceneIndex];
+        if (nextVid) {
+          nextVid.currentTime = 0;
+          nextVid.play().catch(() => {});
+        }
+      }
+
+      const activeMedia =
+        (loadedVideos[sceneIndex] && loadedVideos[sceneIndex]!.readyState >= 2
+          ? loadedVideos[sceneIndex]
+          : null) ||
+        loadedImages[sceneIndex] ||
+        null;
 
       drawSceneFrameOnCanvas(
         ctx,
         width,
         height,
         scenes[sceneIndex] || { title: 'Escena', dialogue: '' },
-        loadedImages[sceneIndex] || null,
+        activeMedia,
         sceneProgress,
         subtitleStyle,
         channelWatermark

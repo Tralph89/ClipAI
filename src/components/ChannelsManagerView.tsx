@@ -42,7 +42,7 @@ export const ChannelsManagerView: React.FC<ChannelsManagerViewProps> = ({
   const [selectedPlatforms, setSelectedPlatforms] = useState<SocialPlatformId[]>([
     'tiktok',
     'youtube_shorts',
-    'instagram_reels',
+    'facebook_reels',
   ]);
   const [webhookUrl, setWebhookUrl] = useState('');
   const [testingChannelId, setTestingChannelId] = useState<string | null>(null);
@@ -252,11 +252,10 @@ export const ChannelsManagerView: React.FC<ChannelsManagerViewProps> = ({
                     type="button"
                     key={plat.id}
                     onClick={() => togglePlatform(plat.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5 ${
-                      active
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5 ${active
                         ? 'bg-violet-600/20 border-violet-500 text-white'
                         : 'bg-[#090A0F] border-white/10 text-zinc-400'
-                    }`}
+                      }`}
                   >
                     {active && <Check className="w-3.5 h-3.5 text-violet-400" />}
                     {plat.name}
@@ -304,9 +303,8 @@ export const ChannelsManagerView: React.FC<ChannelsManagerViewProps> = ({
           return (
             <div
               key={channel.id}
-              className={`bg-[#11131C] rounded-2xl p-6 border transition-all space-y-5 ${
-                isCurrent ? 'border-violet-500 shadow-lg shadow-violet-950/20' : 'border-white/10'
-              }`}
+              className={`bg-[#11131C] rounded-2xl p-6 border transition-all space-y-5 ${isCurrent ? 'border-violet-500 shadow-lg shadow-violet-950/20' : 'border-white/10'
+                }`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3.5">
@@ -379,11 +377,10 @@ export const ChannelsManagerView: React.FC<ChannelsManagerViewProps> = ({
                       <button
                         key={plat.id}
                         onClick={() => handleToggleChannelPlatform(channel.id, plat.id)}
-                        className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-all cursor-pointer ${
-                          active
+                        className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-all cursor-pointer ${active
                             ? plat.badgeColor
                             : 'bg-[#090A0F] border-white/5 text-zinc-500 hover:text-zinc-300'
-                        }`}
+                          }`}
                       >
                         {plat.name}
                       </button>
@@ -416,9 +413,8 @@ export const ChannelsManagerView: React.FC<ChannelsManagerViewProps> = ({
                 </div>
                 {status && (
                   <p
-                    className={`text-xs flex items-center gap-1.5 mt-1 ${
-                      status.ok ? 'text-emerald-400' : 'text-amber-400'
-                    }`}
+                    className={`text-xs flex items-center gap-1.5 mt-1 ${status.ok ? 'text-emerald-400' : 'text-amber-400'
+                      }`}
                   >
                     {status.ok ? (
                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
