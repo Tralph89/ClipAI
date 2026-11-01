@@ -62,11 +62,23 @@ export interface StyleTechnicalProfile {
 export interface Scene {
   title: string;
   dialogue: string;
+  hookText?: string;
+  imagePrompt?: string;
+  stockKeywords?: string[];
+  visualMode?: VisualModeType;
+  sourceType?: 'local_ai' | 'cloud_ai' | 'stock' | 'user_upload';
   imageUrl?: string;
+  videoUrl?: string;
   animatedUrl?: string;
   cameraMotion?: CameraMotionType;
+  durationSec?: number;
+  audioClipUrl?: string;
+  audioTimings?: WordTiming[];
   isGeneratingImage?: boolean;
   isAnimating?: boolean;
+  isGeneratingAudio?: boolean;
+  visualSeed?: number;
+  renderedWithEngine?: string;
   // ComfyUI & Visual Coherence metadata
   comfyPositivePrompt?: string;
   comfyNegativePrompt?: string;
@@ -466,3 +478,140 @@ export const STUDIO_MUSIC_PRESETS = [
   { id: 'viral-phonk', name: 'High Retention Beat (Shorts / TikTok)', tempo: 132, mood: 'Impacto rápido' },
   { id: 'dark-mystery', name: 'Archivo Secreto (Misterio)', tempo: 76, mood: 'Suspenso atmosférico' },
 ];
+
+// ==================== Local Platform & Engine Infrastructure ====================
+export type AIProviderId = 'ollama' | 'gemini' | 'groq';
+export type PublishAutoMode = 'review_first' | 'auto_publish';
+export type LocalVideoEngineId = 'ltx_local' | 'wan_comfyui';
+export type VisualModeType =
+  | 'ltx_local'
+  | 'wan_comfyui'
+  | 'hybrid'
+  | 'stock_broll'
+  | 'ai_images';
+
+export interface LocalVideoEngineInfo {
+  id: LocalVideoEngineId;
+  name: string;
+  port: number;
+  baseUrl: string;
+  installed: boolean;
+  modelSummary: string;
+  status: 'online' | 'starting' | 'offline';
+  managedByClipAI: boolean;
+  busy?: boolean;
+  progressPct?: number;
+  progressPhase?: string;
+  recentLogs: string[];
+}
+
+export interface LocalVideoClusterStatus {
+  gpuName: string;
+  vramTotalMb: number;
+  vramUsedMb: number;
+  vramFreeMb: number;
+  engines: {
+    wan_comfyui: LocalVideoEngineInfo;
+    ltx_local: LocalVideoEngineInfo;
+  };
+}
+
+export interface StockVideoCandidate {
+  id: string;
+  provider: 'pexels' | 'pixabay' | 'wikimedia' | 'nasa';
+  title: string;
+  previewImageUrl?: string;
+  downloadUrl: string;
+  durationSec?: number;
+  width?: number;
+  height?: number;
+  author?: string;
+}
+
+export interface AppSettings {
+  primaryProvider: AIProviderId;
+  fallbackProvider: AIProviderId | 'none';
+  ollamaBaseUrl: string;
+  ollamaModel: string;
+  ollamaKeepAlive: string;
+  geminiApiKey?: string;
+  geminiModel: string;
+  groqApiKey?: string;
+  groqModel: string;
+  pexelsApiKey?: string;
+  pixabayApiKey?: string;
+  localSdUrl?: string;
+  comfyUiUrl?: string;
+  ltxLocalUrl?: string;
+  preferredLocalVideoEngine?: LocalVideoEngineId;
+  publishAutoMode: PublishAutoMode;
+  defaultVoiceEngine: 'edge-tts' | 'piper' | 'gemini-tts';
+}
+
+export interface OllamaModelInfo {
+  name: string;
+  sizeBytes: number;
+  parameterSize?: string;
+  family?: string;
+  capabilities?: string[];
+}
+
+export interface LocalToolStatus {
+  id: string;
+  name: string;
+  available: boolean;
+  path?: string;
+  role: string;
+}
+
+export interface SystemStatus {
+  ollamaReachable: boolean;
+  ollamaVersion?: string;
+  ollamaModels: OllamaModelInfo[];
+  tools: LocalToolStatus[];
+  storageDir: string;
+  mediaCount: number;
+}
+
+export interface WordTiming {
+  word: string;
+  startSec: number;
+  endSec: number;
+}
+
+export interface TrendScanTelemetry {
+  providerUsed: string;
+  modelUsed: string;
+  latencyMs: number;
+  rawSignalsCount: number;
+  breakdown: Record<string, number>;
+}
+
+export const DEFAULT_SETTINGS: AppSettings = {
+  primaryProvider: 'ollama',
+  fallbackProvider: 'gemini',
+  ollamaBaseUrl: 'http://127.0.0.1:11434',
+  ollamaModel: 'gemma4:12b',
+  ollamaKeepAlive: '10m',
+  geminiApiKey: '',
+  geminiModel: 'gemini-2.5-flash',
+  groqApiKey: '',
+  groqModel: 'llama-3.3-70b-versatile',
+  pexelsApiKey: '',
+  pixabayApiKey: '',
+  comfyUiUrl: 'http://127.0.0.1:8188',
+  ltxLocalUrl: 'http://127.0.0.1:41954',
+  preferredLocalVideoEngine: 'ltx_local',
+  publishAutoMode: 'review_first',
+  defaultVoiceEngine: 'edge-tts',
+};
+
+export interface VoiceOption {
+  id: string;
+  name: string;
+  engine: 'edge' | 'piper';
+  accent: string;
+  gender: 'Femenina' | 'Masculina';
+  tags: string[];
+  sampleText: string;
+}
