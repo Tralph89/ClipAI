@@ -91,7 +91,7 @@ export async function craftVisualBibleAndPrompts(params: {
 
 export async function generateSpeech(
   text: string,
-  voiceName: string = 'Kore',
+  voiceName: string = 'es-MX-DaliaNeural',
   language: string = 'es'
 ): Promise<string> {
   const response = await fetch('/api/tts', {

@@ -287,7 +287,7 @@ export default function App() {
     style: 'cinematic',
     aspectRatio: '9:16',
     language: 'es',
-    voice: 'Kore',
+    voice: 'es-MX-DaliaNeural',
     music: 'cyber-pulse',
     subtitleStyle: 'hormozi',
     comfyConfig: DEFAULT_COMFY_CONFIG,
@@ -537,6 +537,26 @@ export default function App() {
   };
 
   // Step 2: Generate Voiceover (Gemini 3.8 TTS)
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const sampleAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const handlePlayVoiceSample = (e: React.MouseEvent, voiceId: string) => {
+    e.stopPropagation();
+    if (sampleAudioRef.current) {
+      sampleAudioRef.current.pause();
+      if (playingVoiceId === voiceId) {
+        setPlayingVoiceId(null);
+        return;
+      }
+    }
+    const audio = new Audio(`/media/audio/samples/sample_${voiceId}.mp3`);
+    sampleAudioRef.current = audio;
+    setPlayingVoiceId(voiceId);
+    audio.play().catch(() => setPlayingVoiceId(null));
+    audio.onended = () => setPlayingVoiceId(null);
+    audio.onerror = () => setPlayingVoiceId(null);
+  };
+
   const handleGenerateVoiceover = async () => {
     const fullDialogue =
       scenes.length > 0 ? scenes.map((s) => s.dialogue).join(' ') : state.script;
@@ -1658,31 +1678,50 @@ export default function App() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {VOICES.map((v) => {
                       const selected = state.voice === v.id;
+                      const isPlaying = playingVoiceId === v.id;
                       return (
-                        <button
+                        <div
                           key={v.id}
                           onClick={() => setState((prev) => ({ ...prev, voice: v.id }))}
-                          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer select-none ${
                             selected
-                              ? 'bg-violet-600/20 border-violet-500 text-white'
+                              ? 'bg-violet-600/20 border-violet-500 text-white shadow-lg shadow-violet-600/10'
                               : 'bg-[#090A0F] border-white/10 text-zinc-300 hover:border-white/20'
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-sm">{v.name}</span>
-                            {selected && <CheckCircle2 className="w-4 h-4 text-violet-400" />}
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={(e) => handlePlayVoiceSample(e, v.id)}
+                                className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                                  isPlaying
+                                    ? 'bg-violet-600 border-violet-400 text-white animate-pulse'
+                                    : 'bg-white/5 border-white/10 hover:bg-white/15 text-zinc-300 hover:text-white'
+                                }`}
+                                title="Escuchar muestra de voz"
+                              >
+                                {isPlaying ? (
+                                  <Pause className="w-3.5 h-3.5" />
+                                ) : (
+                                  <Play className="w-3.5 h-3.5 fill-current" />
+                                )}
+                              </button>
+                              <span className="font-bold text-sm">{v.name}</span>
+                            </div>
+                            {selected && <CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />}
                           </div>
-                          <div className="flex flex-wrap gap-1 mt-2">
+                          <div className="flex flex-wrap gap-1 mt-2.5">
                             {v.tags.map((t) => (
                               <span
                                 key={t}
-                                className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-zinc-400"
+                                className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-zinc-400 font-medium"
                               >
                                 {t}
                               </span>
                             ))}
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>

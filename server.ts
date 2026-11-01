@@ -334,7 +334,7 @@ ensureStorageDirectories();
   // 3a. Single Clip Speech Generation (Piper Neural HD ONNX Primary + Edge-TTS / SAPI Fallback)
   app.post('/api/tts', async (req, res) => {
     try {
-      const { text, voice = 'Kore', language = 'es', speed = 1.08, filenamePrefix = 'tts' } = req.body;
+      const { text, voice = 'es-MX-DaliaNeural', language = 'es', speed = 1.08, filenamePrefix = 'tts' } = req.body;
       const clip = await synthesizeSingleVoiceClip({
         text,
         voice,
