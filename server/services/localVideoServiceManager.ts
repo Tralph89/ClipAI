@@ -487,6 +487,8 @@ export async function startLocalVideoEngine(
           '127.0.0.1',
           '--port',
           port,
+          '--enable-cors-header',
+          '*',
           '--extra-model-paths-config',
           extraPathsYaml,
         ],
