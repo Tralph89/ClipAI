@@ -483,7 +483,9 @@ export default function App() {
         nextState.language,
         chosenRatio,
         activeChannel.tone,
-        `${trend.whyTrending} (${trend.summary})`
+        trend.fullTranscript
+          ? `TRANSCRIPCIÓN COMPLETA DEL CASO / VIDEO DE REFERENCIA:\n"""\n${trend.fullTranscript.slice(0, 14000)}\n"""\n\nResumen del misterio: ${trend.summary}\nPuntos clave: ${trend.angle}\nGancho sugerido: ${trend.suggestedHook}`
+          : `${trend.whyTrending} (${trend.summary})`
       );
       const parsedScenes = parseScriptIntoScenes(
         generated,

@@ -230,27 +230,34 @@ export async function generateAIText(options: AIGenerationOptions): Promise<AIGe
       latencyMs: Date.now() - start,
     };
   } catch (primaryErr: any) {
+    // Smart Quota & Resilience: If Gemini fails (429 Quota Exceeded, network, etc.), automatically failover to local Ollama with gemma4:12b
     const fallback = settings.fallbackProvider;
-    if (
-      !options.overrideProvider &&
-      fallback &&
-      fallback !== 'none' &&
-      fallback !== primary
-    ) {
+    const effectiveFallback: AIProviderId | null =
+      fallback && fallback !== 'none' && fallback !== primary
+        ? fallback
+        : primary === 'gemini'
+          ? 'ollama'
+          : null;
+
+    if (!options.overrideProvider && effectiveFallback) {
       console.warn(
-        `[aiProvider] Motor principal (${primary}) falló (${primaryErr.message}). Intentando respaldo (${fallback})...`
+        `[aiProvider] Motor principal (${primary}) falló (${primaryErr.message}). Conmutando automáticamente a respaldo (${effectiveFallback} con ${settings.ollamaModel || 'gemma4:12b'})...`
       );
-      const fallbackStart = Date.now();
-      const out = await invokeSingleProvider(fallback, settings, {
-        ...options,
-        overrideModel: undefined,
-      });
-      return {
-        text: out.text,
-        providerUsed: fallback,
-        modelUsed: out.modelUsed,
-        latencyMs: Date.now() - fallbackStart,
-      };
+      try {
+        const fallbackStart = Date.now();
+        const out = await invokeSingleProvider(effectiveFallback, settings, {
+          ...options,
+          overrideModel: effectiveFallback === 'ollama' ? (settings.ollamaModel || 'gemma4:12b') : undefined,
+        });
+        return {
+          text: out.text,
+          providerUsed: effectiveFallback,
+          modelUsed: out.modelUsed,
+          latencyMs: Date.now() - fallbackStart,
+        };
+      } catch (fallbackErr: any) {
+        console.error(`[aiProvider] Motor de respaldo (${effectiveFallback}) también falló:`, fallbackErr.message);
+      }
     }
     throw primaryErr;
   }

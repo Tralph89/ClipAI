@@ -166,6 +166,7 @@ export interface TrendItem {
   keywords: string[];
   sources: Array<{ title: string; uri: string }>;
   detectedAt: number;
+  fullTranscript?: string;
 }
 
 export interface ScheduledPost {

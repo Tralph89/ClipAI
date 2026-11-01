@@ -118,6 +118,7 @@ export const TrendRadarView: React.FC<TrendRadarViewProps> = ({
       trafficBadge: Math.round(transcriptionResult.durationSec / 60) + ' min transcritos',
       sourceTypes: ['youtube'],
       detectedAt: Date.now(),
+      fullTranscript: transcriptionResult.transcript,
     };
     onCreateVideoFromTrend(syntheticTrend, chosenRatio);
   };

@@ -26,52 +26,75 @@ function cleanSpokenDialogue(raw: string): string {
 function getDurationTargets(duration: string, aspectRatio: AspectRatioType): {
   minScenes: number;
   maxScenes: number;
+  exactTargetScenes: number;
   targetWords: string;
   wordsPerScene: string;
 } {
   switch (duration) {
     case '30s':
       return {
+        exactTargetScenes: 4,
         minScenes: 4,
         maxScenes: 5,
-        targetWords: '65 a 80 palabras en total',
-        wordsPerScene: '14 a 18 palabras por escena',
+        targetWords: '68 a 78 palabras en total (~4 escenas de 7.5s cada una)',
+        wordsPerScene: '16 a 19 palabras por escena (ideal para 7.5 a 8 segundos)',
       };
     case '60s':
       return {
-        minScenes: 5,
-        maxScenes: 6,
-        targetWords: '125 a 150 palabras en total',
-        wordsPerScene: '22 a 28 palabras por escena',
+        exactTargetScenes: 8,
+        minScenes: 7,
+        maxScenes: 8,
+        targetWords: '135 a 155 palabras en total (~7-8 escenas de 7.5s a 8s)',
+        wordsPerScene: '18 a 21 palabras por escena (ideal para 7.5 a 8 segundos)',
+      };
+    case '90s':
+      return {
+        exactTargetScenes: 12,
+        minScenes: 11,
+        maxScenes: 12,
+        targetWords: '210 a 240 palabras en total (~11-12 escenas de 7.5s a 8s)',
+        wordsPerScene: '18 a 21 palabras por escena (ideal para 7.5 a 8 segundos)',
       };
     case '3m':
       return {
-        minScenes: 7,
-        maxScenes: 8,
-        targetWords: '340 a 420 palabras en total',
-        wordsPerScene: '45 a 55 palabras por escena',
+        exactTargetScenes: 21,
+        minScenes: 20,
+        maxScenes: 24,
+        targetWords: '400 a 460 palabras en total (~21 a 24 escenas de 8s)',
+        wordsPerScene: '18 a 22 palabras por escena (ideal para 7.5 a 8 segundos)',
       };
     case '5m':
+      return {
+        exactTargetScenes: 38,
+        minScenes: 36,
+        maxScenes: 40,
+        targetWords: '720 a 800 palabras en total (~38 escenas de 8s)',
+        wordsPerScene: '18 a 22 palabras por escena (ideal para 7.5 a 8 segundos)',
+      };
+    case '8m':
     case '10m':
       return {
-        minScenes: 8,
-        maxScenes: 10,
-        targetWords: '550 a 750 palabras en total',
-        wordsPerScene: '60 a 80 palabras por escena',
+        exactTargetScenes: 60,
+        minScenes: 58,
+        maxScenes: 62,
+        targetWords: '1150 a 1250 palabras en total (~60 escenas de 8s)',
+        wordsPerScene: '18 a 22 palabras por escena (ideal para 7.5 a 8 segundos)',
       };
     default:
       return aspectRatio === '16:9'
         ? {
-            minScenes: 6,
-            maxScenes: 8,
-            targetWords: '260 a 340 palabras en total',
-            wordsPerScene: '38 a 48 palabras por escena',
+            exactTargetScenes: 21,
+            minScenes: 20,
+            maxScenes: 24,
+            targetWords: '400 a 460 palabras en total (~21 escenas)',
+            wordsPerScene: '18 a 22 palabras por escena',
           }
         : {
-            minScenes: 5,
-            maxScenes: 6,
-            targetWords: '120 a 145 palabras en total',
-            wordsPerScene: '20 a 26 palabras por escena',
+            exactTargetScenes: 8,
+            minScenes: 7,
+            maxScenes: 8,
+            targetWords: '135 a 155 palabras en total (~8 escenas)',
+            wordsPerScene: '18 a 21 palabras por escena',
           };
   }
 }
@@ -159,10 +182,16 @@ Datos del proyecto:
 - Tono del canal: ${params.channelTone || 'Dinámico, claro, revelador y de alta retención'}
 - Idioma OBLIGATORIO para "dialogue" y "hook": ${langLabel}
 - Tema / Idea central: "${params.prompt}"
-${params.trendContext ? `- Contexto verificado de la tendencia: ${params.trendContext}` : ''}
+${
+  params.trendContext
+    ? `\n### MATERIAL DE REFERENCIA / TRANSCRIPCIÓN COMPLETA DEL CASO:\n${params.trendContext}\n\nDIRECTIVAS DE ADAPTACIÓN:
+- Se te ha proporcionado el material o transcripción completa. Adapta esta historia preservando los detalles más aterradores, nombres reales, horas (ej. 'las 3:14 AM'), ubicaciones y diálogos del testimonio original.
+- Distribuye la narrativa a lo largo de las ${targets.exactTargetScenes} escenas de forma progresiva (Gancho inicial -> Tensión -> Clímax -> Cierre inquietante) para que cubra exactamente la duración de ${params.duration || '60s'}.`
+    : ''
+}
 
 Reglas estrictas de retención y producción:
-1. Genera entre ${targets.minScenes} y ${targets.maxScenes} escenas (${targets.wordsPerScene}).
+1. Genera OBLIGATORIAMENTE entre ${targets.minScenes} y ${targets.maxScenes} escenas (meta exacta para cubrir la duración de ${params.duration || '60s'}: ${targets.exactTargetScenes} escenas). Cada escena debe durar aproximadamente 7.5 a 8 segundos (${targets.wordsPerScene}).
 2. La Escena 1 DEBE abrir con un Hook verbal explosivo en los primeros 3 segundos que detenga el scroll de inmediato (prohibido saludar con "Hola amigos" o "Bienvenidos").
 3. "dialogue" debe contener ÚNICAMENTE el texto limpio que leerá el sintetizador de voz neural en ${langLabel} (sin acotaciones entre paréntesis, sin emojis, sin escribir "Narrador:").
 4. "title" es la descripción visual clara en español para el editor.
