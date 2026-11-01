@@ -296,7 +296,7 @@ export default function App() {
     style: 'horror',
     aspectRatio: '9:16',
     language: 'es',
-    voice: 'es-ES-AlvaroNeural',
+    voice: 'xtts-hugo-m',
     music: 'dark-mystery',
     subtitleStyle: 'hormozi',
     comfyConfig: DEFAULT_COMFY_CONFIG,
@@ -560,7 +560,9 @@ export default function App() {
         return;
       }
     }
-    const audio = new Audio(`/media/audio/samples/sample_${voiceId}.mp3`);
+    const voiceObj = VOICES.find((v) => v.id === voiceId);
+    const audioUrl = voiceObj?.previewUrl || `/media/audio/samples/sample_${voiceId}.mp3`;
+    const audio = new Audio(audioUrl);
     sampleAudioRef.current = audio;
     setPlayingVoiceId(voiceId);
     audio.play().catch(() => setPlayingVoiceId(null));
@@ -1690,13 +1692,18 @@ export default function App() {
                     {VOICES.map((v) => {
                       const selected = state.voice === v.id;
                       const isPlaying = playingVoiceId === v.id;
+                      const isCloned = v.engine === 'xtts';
                       return (
                         <div
                           key={v.id}
                           onClick={() => setState((prev) => ({ ...prev, voice: v.id }))}
                           className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer select-none ${
                             selected
-                              ? 'bg-violet-600/20 border-violet-500 text-white shadow-lg shadow-violet-600/10'
+                              ? isCloned
+                                ? 'bg-red-950/40 border-red-500 text-white shadow-lg shadow-red-600/20'
+                                : 'bg-violet-600/20 border-violet-500 text-white shadow-lg shadow-violet-600/10'
+                              : isCloned
+                              ? 'bg-[#12080a] border-red-900/30 text-zinc-300 hover:border-red-700/50'
                               : 'bg-[#090A0F] border-white/10 text-zinc-300 hover:border-white/20'
                           }`}
                         >
@@ -1707,7 +1714,9 @@ export default function App() {
                                 onClick={(e) => handlePlayVoiceSample(e, v.id)}
                                 className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
                                   isPlaying
-                                    ? 'bg-violet-600 border-violet-400 text-white animate-pulse'
+                                    ? isCloned
+                                      ? 'bg-red-600 border-red-400 text-white animate-pulse'
+                                      : 'bg-violet-600 border-violet-400 text-white animate-pulse'
                                     : 'bg-white/5 border-white/10 hover:bg-white/15 text-zinc-300 hover:text-white'
                                 }`}
                                 title="Escuchar muestra de voz"
@@ -1718,15 +1727,32 @@ export default function App() {
                                   <Play className="w-3.5 h-3.5 fill-current" />
                                 )}
                               </button>
-                              <span className="font-bold text-sm">{v.name}</span>
+                              <div className="flex flex-col">
+                                <span className="font-bold text-sm">{v.name}</span>
+                                {isCloned && (
+                                  <span className="text-[10px] text-red-400 font-semibold tracking-wider uppercase">
+                                    Voz Clonada Local • Archivo Clasificado
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            {selected && <CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />}
+                            {selected && (
+                              <CheckCircle2
+                                className={`w-4 h-4 flex-shrink-0 ${
+                                  isCloned ? 'text-red-400' : 'text-violet-400'
+                                }`}
+                              />
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-1 mt-2.5">
                             {v.tags.map((t) => (
                               <span
                                 key={t}
-                                className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-zinc-400 font-medium"
+                                className={`text-[10px] px-2 py-0.5 rounded font-medium ${
+                                  t === 'Voz Clonada'
+                                    ? 'bg-red-900/40 text-red-300 border border-red-700/40'
+                                    : 'bg-white/5 text-zinc-400'
+                                }`}
                               >
                                 {t}
                               </span>

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { fileURLToPath } from 'url';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { Scene, VOICES, WordTiming } from '../../src/types.ts';
@@ -12,6 +13,8 @@ import {
 } from '../storage/localDb.ts';
 import { resolveLocalToolPath } from './systemTools.ts';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const execFileAsync = promisify(execFile);
 
 export const PIPER_MODELS_DIR = path.join(DATA_DIR, 'models', 'piper');
@@ -397,6 +400,95 @@ export async function synthesizeSingleVoiceClip(params: {
   const isExplicitEdgeVoice = /^[a-z]{2}-[A-Z]{2}-.+Neural$/i.test(voice);
   const isExplicitPiperProfile =
     Boolean(PIPER_CATALOG[voice]) || ['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'].includes(voice);
+
+  // 0. Coqui XTTS-v2 Cloned Voices (Hugo M, Benji, Relatos de la Noche, Sky)
+  const isXttsClonedVoice = voice.startsWith('xtts-');
+  if (isXttsClonedVoice) {
+    const resolveVoiceRef = (filename: string) => {
+      const candidates = [
+        path.join(process.cwd(), 'data', 'voices', 'cloned', filename),
+        path.join(process.cwd(), 'ClipAI', 'data', 'voices', 'cloned', filename),
+        path.join('d:/Workspace/ClipAI/ClipAI/data/voices/cloned', filename),
+      ];
+      return candidates.find((p) => fs.existsSync(p)) || candidates[0];
+    };
+
+    const xttsMap: Record<string, { refFile: string; label: string; defaultSpeed: number }> = {
+      'xtts-hugo-m': {
+        refFile: resolveVoiceRef('hugo_misterio.wav'),
+        label: 'Hugo M (Ultra Grave & Misterio)',
+        defaultSpeed: 0.85,
+      },
+      'xtts-benji': {
+        refFile: resolveVoiceRef('benji_storyteller.wav'),
+        label: 'Benji (Storyteller Cálido & Grave)',
+        defaultSpeed: 0.85,
+      },
+      'xtts-relatos': {
+        refFile: resolveVoiceRef('relatos_de_la_noche.wav'),
+        label: 'Relatos de la Noche (Narrador Original)',
+        defaultSpeed: 0.85,
+      },
+      'xtts-sky': {
+        refFile: resolveVoiceRef('sky_femenina.wav'),
+        label: 'Sky (Misterio Femenino)',
+        defaultSpeed: 0.85,
+      },
+    };
+
+    const targetConfig = xttsMap[voice] || xttsMap['xtts-hugo-m'];
+    const possiblePythonPaths = [
+      path.join(process.cwd(), '..', 'engines', 'f5-tts-env', 'Scripts', 'python.exe'),
+      path.join(process.cwd(), 'engines', 'f5-tts-env', 'Scripts', 'python.exe'),
+      'd:/Workspace/ClipAI/engines/f5-tts-env/Scripts/python.exe',
+      'd:\\Workspace\\ClipAI\\engines\\f5-tts-env\\Scripts\\python.exe',
+    ];
+    const xttsPythonPath = possiblePythonPaths.find((p) => fs.existsSync(p)) || possiblePythonPaths[0];
+
+    const possibleRunnerScripts = [
+      path.join(process.cwd(), 'server', 'services', 'xtts_runner.py'),
+      path.join(__dirname, 'xtts_runner.py'),
+      path.join(process.cwd(), 'ClipAI', 'server', 'services', 'xtts_runner.py'),
+      'd:/Workspace/ClipAI/ClipAI/server/services/xtts_runner.py',
+    ];
+    const runnerScript = possibleRunnerScripts.find((p) => fs.existsSync(p)) || possibleRunnerScripts[0];
+
+    const outWavName = `${prefix}_xtts_${uniqueTag}.wav`;
+    const outWavPath = path.join(audioDir, outWavName);
+
+    if (fs.existsSync(xttsPythonPath) && fs.existsSync(runnerScript) && fs.existsSync(targetConfig.refFile)) {
+      try {
+        const effectiveSpeed = params.speed ? Number(params.speed) : targetConfig.defaultSpeed;
+        await execFileAsync(
+          xttsPythonPath,
+          [
+            runnerScript,
+            '--ref_wav', targetConfig.refFile,
+            '--text', cleanText,
+            '--speed', String(effectiveSpeed),
+            '--out_wav', outWavPath,
+          ],
+          { timeout: 90_000, env: { ...process.env, PYTHONUTF8: '1', COQUI_TOS_AGREED: '1' } }
+        );
+
+        if (fs.existsSync(outWavPath) && fs.statSync(outWavPath).size > 1000) {
+          const durationSec = await probeAudioDurationSec(outWavPath);
+          const wordTimings = computeSceneWordTimings(cleanText, durationSec);
+          return {
+            audioUrl: `/media/audio/${outWavName}`,
+            diskPath: outWavPath,
+            mimeType: 'audio/wav',
+            durationSec,
+            wordTimings,
+            engine: 'xtts-v2-cloned',
+            voiceUsed: targetConfig.label,
+          };
+        }
+      } catch (xttsErr: any) {
+        console.warn(`[voiceEngine] XTTS synthesis falló (${xttsErr.message}). Conmutando a Edge-TTS de respaldo...`);
+      }
+    }
+  }
 
   // 1. Microsoft Edge Neural TTS (Direct Spanish/Multilingual Neural Voice when an Edge voice is selected, or when Edge-TTS is default engine)
   if (edgeTtsPath && (isExplicitEdgeVoice || (preferredEngine === 'edge-tts' && !isExplicitPiperProfile))) {
@@ -838,6 +930,22 @@ export async function getOrCreateVoiceSample(params: {
 }> {
   const voiceId = (params.voice || 'es-MX-DaliaNeural').trim();
   const safeId = voiceId.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+  const xttsPreviews: Record<string, string> = {
+    'xtts-hugo-m': '/samples/xtts_hugo_misterio_lento.wav',
+    'xtts-benji': '/samples/xtts_benji_storyteller_lento.wav',
+    'xtts-relatos': '/samples/xtts_relatos_de_la_noche_lento.wav',
+    'xtts-sky': '/samples/xtts_sky_femenina_toma1_lento.wav',
+  };
+
+  if (xttsPreviews[voiceId] && !params.customText) {
+    return {
+      sampleAudioUrl: xttsPreviews[voiceId],
+      engine: 'xtts-v2-cloned',
+      voiceUsed: voiceId,
+      cached: true,
+    };
+  }
   const samplesDir = path.join(MEDIA_DIR, 'audio', 'samples');
   fs.mkdirSync(samplesDir, { recursive: true });
 

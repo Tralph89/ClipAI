@@ -484,6 +484,46 @@ export const VIDEO_STYLES: StyleTechnicalProfile[] = [
 
 export const VOICES: VoiceOption[] = [
   {
+    id: 'xtts-hugo-m',
+    name: 'Hugo M (Ultra Grave & Misterio)',
+    engine: 'xtts',
+    accent: 'Hispanoamérica',
+    gender: 'Masculina',
+    tags: ['Voz Clonada', 'Ultra Grave', 'Archivo Clasificado', 'Terror'],
+    sampleText: 'Eran las tres y cuarto de la madrugada... cuando aquel sonido bajo la cama comenzó a respirar. Si estás solo escuchando esto... no te des la vuelta.',
+    previewUrl: '/samples/xtts_hugo_misterio_lento.wav',
+  },
+  {
+    id: 'xtts-benji',
+    name: 'Benji (Storyteller Cálido & Grave)',
+    engine: 'xtts',
+    accent: 'Hispanoamérica',
+    gender: 'Masculina',
+    tags: ['Voz Clonada', 'Documental', 'Misterio', 'Crónicas'],
+    sampleText: 'En los archivos clasificados de la policía hay un reporte que fue borrado en mil novecientos noventa y cuatro. Hoy revelaremos lo que ocultaron.',
+    previewUrl: '/samples/xtts_benji_storyteller_lento.wav',
+  },
+  {
+    id: 'xtts-relatos',
+    name: 'Relatos de la Noche (Narrador Original)',
+    engine: 'xtts',
+    accent: 'México',
+    gender: 'Masculina',
+    tags: ['Voz Clonada', 'Relatos de la Noche', 'Atmosférica', 'Terror Real'],
+    sampleText: 'Me gusta saber que esta historia la va a escuchar la comunidad relatos de la noche.',
+    previewUrl: '/samples/xtts_relatos_de_la_noche_lento.wav',
+  },
+  {
+    id: 'xtts-sky',
+    name: 'Sky (Misterio Femenino)',
+    engine: 'xtts',
+    accent: 'Hispanoamérica',
+    gender: 'Femenina',
+    tags: ['Voz Clonada', 'Femenina', 'Suspenso Psicológico', 'Creepypastas'],
+    sampleText: 'Dicen que si miras fijamente a la niebla por más de diez segundos... la figura que ves a lo lejos comenzará a caminar hacia ti.',
+    previewUrl: '/samples/xtts_sky_femenina_toma1_lento.wav',
+  },
+  {
     id: 'es-MX-DaliaNeural',
     name: 'Dalia (México)',
     engine: 'edge',
@@ -713,7 +753,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
 export interface VoiceOption {
   id: string;
   name: string;
-  engine: 'edge' | 'piper';
+  engine: 'edge' | 'piper' | 'xtts';
+  previewUrl?: string;
   accent: string;
   gender: 'Femenina' | 'Masculina';
   tags: string[];
