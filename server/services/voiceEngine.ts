@@ -455,20 +455,24 @@ export async function synthesizeSingleVoiceClip(params: {
 
     const outWavName = `${prefix}_xtts_${uniqueTag}.wav`;
     const outWavPath = path.join(audioDir, outWavName);
+    const tmpTextFile = path.join(audioDir, `txt_${uniqueTag}.txt`);
 
     if (fs.existsSync(xttsPythonPath) && fs.existsSync(runnerScript) && fs.existsSync(targetConfig.refFile)) {
       try {
+        fs.writeFileSync(tmpTextFile, cleanText, 'utf-8');
         const effectiveSpeed = params.speed ? Number(params.speed) : targetConfig.defaultSpeed;
+        const xttsTimeoutMs = Math.max(300_000, cleanText.length * 600); // Mínimo 5 minutos
+
         await execFileAsync(
           xttsPythonPath,
           [
             runnerScript,
             '--ref_wav', targetConfig.refFile,
-            '--text', cleanText,
+            '--text_file', tmpTextFile,
             '--speed', String(effectiveSpeed),
             '--out_wav', outWavPath,
           ],
-          { timeout: 90_000, env: { ...process.env, PYTHONUTF8: '1', COQUI_TOS_AGREED: '1' } }
+          { timeout: xttsTimeoutMs, env: { ...process.env, PYTHONUTF8: '1', COQUI_TOS_AGREED: '1' } }
         );
 
         if (fs.existsSync(outWavPath) && fs.statSync(outWavPath).size > 1000) {
@@ -485,7 +489,11 @@ export async function synthesizeSingleVoiceClip(params: {
           };
         }
       } catch (xttsErr: any) {
-        console.warn(`[voiceEngine] XTTS synthesis falló (${xttsErr.message}). Conmutando a Edge-TTS de respaldo...`);
+        console.error(`[voiceEngine] XTTS synthesis falló (${xttsErr.message}). Conmutando a Edge-TTS de respaldo...`);
+      } finally {
+        try {
+          if (fs.existsSync(tmpTextFile)) fs.unlinkSync(tmpTextFile);
+        } catch {}
       }
     }
   }
@@ -498,6 +506,10 @@ export async function synthesizeSingleVoiceClip(params: {
       Charon: 'es-ES-AlvaroNeural',
       Fenrir: 'es-AR-TomasNeural',
       Zephyr: 'es-CO-SalomeNeural',
+      'xtts-hugo-m': 'es-ES-AlvaroNeural',
+      'xtts-benji': 'es-MX-JorgeNeural',
+      'xtts-relatos': 'es-MX-JorgeNeural',
+      'xtts-sky': 'es-MX-DaliaNeural',
     };
     const voiceMapEn: Record<string, string> = {
       Kore: 'en-US-AriaNeural',
