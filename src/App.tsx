@@ -221,13 +221,22 @@ export default function App() {
   const [channels, setChannels] = useState<SocialChannel[]>(() => {
     try {
       const saved = localStorage.getItem('clipai_channels_v2');
-      return saved ? JSON.parse(saved) : DEFAULT_CHANNELS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          if (!parsed.some((c: SocialChannel) => c.id === 'channel-archivo-clasificado')) {
+            return [DEFAULT_CHANNELS[0], ...parsed];
+          }
+          return parsed;
+        }
+      }
+      return DEFAULT_CHANNELS;
     } catch {
       return DEFAULT_CHANNELS;
     }
   });
   const [activeChannelId, setActiveChannelId] = useState<string>(
-    () => channels[0]?.id || 'channel-tech-ai'
+    () => channels[0]?.id || 'channel-archivo-clasificado'
   );
   const activeChannel = channels.find((c) => c.id === activeChannelId) || channels[0];
 
@@ -274,21 +283,21 @@ export default function App() {
 
   // Active Studio State
   const [prompt, setPrompt] = useState<string>(
-    'Cómo los nuevos Agentes de IA están automatizando empresas enteras en 2026'
+    'El perturbador caso de la cabaña abandonada en el bosque negro y las cintas que la policía ocultó'
   );
   const [sourceTrendTitle, setSourceTrendTitle] = useState<string | undefined>(undefined);
   const [state, setState] = useState<VideoState>({
     step: 1,
     videoType: 'short',
-    genre: 'educational',
-    subgenre: 'Tendencia IA',
+    genre: 'horror',
+    subgenre: 'Expedientes Desclasificados & Sin Resolver',
     duration: '60s',
     script: '',
-    style: 'cinematic',
+    style: 'horror',
     aspectRatio: '9:16',
     language: 'es',
-    voice: 'es-MX-DaliaNeural',
-    music: 'cyber-pulse',
+    voice: 'es-ES-AlvaroNeural',
+    music: 'dark-mystery',
     subtitleStyle: 'hormozi',
     comfyConfig: DEFAULT_COMFY_CONFIG,
   });

@@ -32,6 +32,7 @@ import {
   generateAIText,
 } from './server/services/aiProvider.ts';
 import { discoverMultiSourceTrends } from './server/services/trendCollector.ts';
+import { transcribeVideoUrl } from './server/services/videoTranscriber.ts';
 import { generateStructuredViralScript } from './server/services/scriptGenerator.ts';
 import {
   buildSyncedSrtFromScenes,
@@ -296,6 +297,22 @@ ensureStorageDirectories();
     } catch (error: any) {
       console.error('Error searching trends:', error);
       res.status(500).json({ error: error.message || 'Error al escanear tendencias en vivo.' });
+    }
+  });
+
+  // 1b. Transcribe Video URL directly (YouTube / TikTok -> Clean Transcript + Horror Story Outline)
+  app.post('/api/trends/transcribe-url', async (req, res) => {
+    try {
+      const { url } = req.body || {};
+      if (!url || typeof url !== 'string') {
+        return res.status(400).json({ error: 'Ingresa un enlace válido de YouTube o TikTok.' });
+      }
+
+      const result = await transcribeVideoUrl(url);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error transcribing video URL:', error);
+      res.status(500).json({ error: error.message || 'No se pudo transcribir el video.' });
     }
   });
 

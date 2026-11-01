@@ -739,3 +739,30 @@ export async function fetchRenderJobStatus(jobId: string) {
 }
 
 
+
+export interface VideoTranscriptionData {
+  url: string;
+  title: string;
+  uploader: string;
+  durationSec: number;
+  thumbnailUrl: string;
+  transcript: string;
+  summary: string;
+  suggestedHook: string;
+  angle: string;
+  mysteryElements: string[];
+  recommendedFormats: ('9:16' | '16:9')[];
+}
+
+export async function transcribeVideoUrl(url: string): Promise<VideoTranscriptionData> {
+  const response = await fetch('/api/trends/transcribe-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'No se pudo transcribir el video.');
+  }
+  return data;
+}

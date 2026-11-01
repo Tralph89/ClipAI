@@ -21,7 +21,8 @@ import {
   TrendItem,
   TrendScanTelemetry,
 } from '../types';
-import { searchLiveTrends } from '../services/apiService';
+import { searchLiveTrends, transcribeVideoUrl, VideoTranscriptionData } from '../services/apiService';
+import { FileText, Play, ChevronDown, ChevronUp, AlertCircle, Sparkles, Video } from 'lucide-react';
 
 interface TrendRadarViewProps {
   activeChannel: SocialChannel;
@@ -31,12 +32,12 @@ interface TrendRadarViewProps {
 }
 
 const QUICK_NICHES = [
-  'Inteligencia Artificial & Tech',
-  'Finanzas, Cripto & Negocios',
-  'Ciencia & Descubrimientos',
-  'Marketing Digital & Creadores',
-  'Salud, Hábitos & Productividad',
-  'Cultura Pop & Entretenimiento Viral',
+  'Casos Reales & Llamadas al 911',
+  'Relatos de la Noche & Testimonios',
+  'Expedientes Desclasificados & Sin Resolver',
+  'Leyendas Urbanas & Folclore Oscuro',
+  'Dross / Enigmas & Casas Embrujadas',
+  'Misterios Históricos & Objetos Malditos',
 ];
 
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
@@ -77,6 +78,49 @@ export const TrendRadarView: React.FC<TrendRadarViewProps> = ({
   const [telemetry, setTelemetry] = useState<TrendScanTelemetry | null>(null);
   const [selectedRatios, setSelectedRatios] = useState<Record<string, AspectRatioType>>({});
   const [copiedHookId, setCopiedHookId] = useState<string | null>(null);
+
+  // Direct Video URL Transcription State (YouTube / TikTok -> Archivo Clasificado)
+  const [directUrl, setDirectUrl] = useState('');
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcriptionResult, setTranscriptionResult] = useState<VideoTranscriptionData | null>(null);
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
+  const [showFullTranscript, setShowFullTranscript] = useState(false);
+
+  const handleTranscribeDirectUrl = async () => {
+    if (!directUrl.trim()) return;
+    setIsTranscribing(true);
+    setTranscriptionError(null);
+    try {
+      const data = await transcribeVideoUrl(directUrl.trim());
+      setTranscriptionResult(data);
+    } catch (err: any) {
+      setTranscriptionError(err.message || 'Error al transcribir el video.');
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  const handleCreateVideoFromTranscription = (chosenRatio: AspectRatioType) => {
+    if (!transcriptionResult) return;
+    const syntheticTrend: TrendItem = {
+      id: 'transcribe-' + Date.now(),
+      title: transcriptionResult.title,
+      summary: transcriptionResult.summary,
+      viralScore: 98,
+      category: 'Archivo Clasificado / Misterio',
+      whyTrending: 'Video de referencia de ' + transcriptionResult.uploader + ' con transcripción íntegra analizada.',
+      suggestedHook: transcriptionResult.suggestedHook,
+      angle: transcriptionResult.angle,
+      recommendedFormats: transcriptionResult.recommendedFormats,
+      recommendedPlatforms: ['youtube_shorts', 'tiktok', 'facebook_reels', 'youtube_long'],
+      keywords: ['Terror', 'Misterio', 'Archivo Clasificado', ...transcriptionResult.mysteryElements],
+      sources: [{ title: transcriptionResult.uploader, uri: transcriptionResult.url }],
+      trafficBadge: Math.round(transcriptionResult.durationSec / 60) + ' min transcritos',
+      sourceTypes: ['youtube'],
+      detectedAt: Date.now(),
+    };
+    onCreateVideoFromTrend(syntheticTrend, chosenRatio);
+  };
 
   const handleRunLiveSearch = async (
     customQuery?: string,
@@ -198,6 +242,164 @@ export const TrendRadarView: React.FC<TrendRadarViewProps> = ({
               )}
             </button>
           </div>
+        </div>
+
+        {/* DIRECT VIDEO EXTRACTOR (YouTube / TikTok -> Clean Transcript) */}
+        <div className="bg-gradient-to-r from-red-950/40 via-[#18080C] to-zinc-950 border border-red-500/30 rounded-2xl p-5 space-y-4 shadow-xl shadow-red-950/20">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-red-500/20">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+              <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-red-400 bg-red-500/10 border border-red-500/30 px-2.5 py-1 rounded-full">
+                Archivo Clasificado • Extractor Directo
+              </span>
+            </div>
+            <span className="text-xs text-zinc-400">
+              Compatible con YouTube (Relatos de la Noche, Dross, etc.) y TikTok
+            </span>
+          </div>
+
+          <div>
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Video className="w-4 h-4 text-red-400" />
+              Extraer y Transcribir Historia desde Enlace de Video
+            </h2>
+            <p className="text-xs text-zinc-400 mt-1">
+              Pega cualquier URL de un video de misterio, terror o llamada real. Extraeremos la transcripción limpia y el gancho de suspenso automáticamente.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2.5">
+            <input
+              type="url"
+              value={directUrl}
+              onChange={(e) => setDirectUrl(e.target.value)}
+              placeholder="Ej: https://www.youtube.com/watch?v=... o https://tiktok.com/@..."
+              className="flex-1 bg-[#090A0F] border border-white/10 focus:border-red-500 rounded-xl px-4 py-3 text-xs text-white placeholder-zinc-500 focus:outline-none transition-all"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleTranscribeDirectUrl();
+              }}
+            />
+            <button
+              onClick={handleTranscribeDirectUrl}
+              disabled={isTranscribing || !directUrl.trim()}
+              className="px-5 py-3 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-red-600/30 whitespace-nowrap"
+            >
+              {isTranscribing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Transcribiendo Historia...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Transcribir e Importar Historia
+                </>
+              )}
+            </button>
+          </div>
+
+          {transcriptionError && (
+            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold block">Error al procesar el video:</span>
+                <span>{transcriptionError}</span>
+              </div>
+            </div>
+          )}
+
+          {transcriptionResult && (
+            <div className="bg-[#090A0F]/90 border border-red-500/40 rounded-xl p-4 space-y-4 mt-2">
+              <div className="flex flex-col md:flex-row gap-4 items-start">
+                {transcriptionResult.thumbnailUrl && (
+                  <img
+                    src={transcriptionResult.thumbnailUrl}
+                    alt={transcriptionResult.title}
+                    className="w-full md:w-44 h-28 object-cover rounded-lg border border-white/10 flex-shrink-0"
+                  />
+                )}
+                <div className="flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-500/20 text-red-300 font-bold border border-red-500/30">
+                      TRANSCRIPCIÓN COMPLETADA
+                    </span>
+                    <span className="text-xs text-zinc-400">
+                      Fuente: <strong className="text-white">{transcriptionResult.uploader}</strong> ({Math.round(transcriptionResult.durationSec / 60)} min)
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold text-white line-clamp-2">
+                    {transcriptionResult.title}
+                  </h3>
+                  <p className="text-xs text-zinc-300 leading-relaxed">
+                    {transcriptionResult.summary}
+                  </p>
+                </div>
+              </div>
+
+              {/* Hook Suggestion Box */}
+              <div className="bg-red-950/30 border border-red-500/30 rounded-lg p-3">
+                <span className="text-[10px] font-mono text-red-400 uppercase tracking-wider block font-bold mb-1">
+                  Gancho de Suspenso Sugerido (0-5s):
+                </span>
+                <p className="text-xs text-zinc-200 italic font-medium">
+                  "{transcriptionResult.suggestedHook}"
+                </p>
+              </div>
+
+              {/* Mystery Elements Chips */}
+              {transcriptionResult.mysteryElements.length > 0 && (
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block">
+                    Elementos Perturbadores Clave:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {transcriptionResult.mysteryElements.map((elem, idx) => (
+                      <span
+                        key={idx}
+                        className="text-[11px] px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-300"
+                      >
+                        👁️ {elem}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Collapsible Full Transcript */}
+              <div className="pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setShowFullTranscript(!showFullTranscript)}
+                  className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-all cursor-pointer font-medium"
+                >
+                  <FileText className="w-3.5 h-3.5 text-red-400" />
+                  {showFullTranscript ? 'Ocultar Transcripción' : 'Ver Transcripción Completa'}
+                  {showFullTranscript ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+                {showFullTranscript && (
+                  <div className="mt-2.5 p-3 rounded-lg bg-black/60 border border-white/5 max-h-48 overflow-y-auto text-xs text-zinc-300 leading-relaxed font-mono whitespace-pre-wrap">
+                    {transcriptionResult.transcript}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons: Dual Format Output */}
+              <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row gap-2.5 justify-end">
+                <button
+                  onClick={() => handleCreateVideoFromTranscription('9:16')}
+                  className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-red-600/30"
+                >
+                  📱 Crear Short Viral (9:16)
+                </button>
+                <button
+                  onClick={() => handleCreateVideoFromTranscription('16:9')}
+                  className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-white/10 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  🖥️ Crear Documental YouTube (16:9)
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Search Input & Quick Niches */}

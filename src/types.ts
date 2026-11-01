@@ -260,6 +260,18 @@ export const SOCIAL_PLATFORMS: Array<{
 
 export const DEFAULT_CHANNELS: SocialChannel[] = [
   {
+    id: 'channel-archivo-clasificado',
+    name: 'Archivo Clasificado',
+    handle: '@archivoclasificado01',
+    niche: 'Historias de Terror, Casos Paranormales y Expedientes Sin Resolver',
+    tone: 'Inquietante, sombrío, inmersivo, voz de expediente desclasificado',
+    defaultAspectRatio: '9:16',
+    platforms: ['youtube_shorts', 'tiktok', 'facebook_reels', 'youtube_long'],
+    webhookUrl: '',
+    accentColor: '#DC2626',
+    subscribersCount: 'Canal Principal V1',
+  },
+  {
     id: 'channel-tech-ai',
     name: 'Futuro & IA Hoy',
     handle: '@futuroiahoy',
@@ -298,33 +310,39 @@ export const DEFAULT_CHANNELS: SocialChannel[] = [
 ];
 
 export const GENRES = [
+  { id: 'horror', name: 'Misterio & Terror (Archivo Clasificado)' },
+  { id: 'documentary', name: 'Documental & Investigaciones' },
+  { id: 'fiction', name: 'Ficción & Storytelling' },
   { id: 'educational', name: 'Educativo & Tech' },
   { id: 'marketing', name: 'Negocios & Marketing' },
-  { id: 'documentary', name: 'Documental & Noticias' },
   { id: 'motivational', name: 'Motivacional & Hábitos' },
-  { id: 'fiction', name: 'Ficción & Storytelling' },
-  { id: 'religious', name: 'Histórico & Espiritual' },
   { id: 'comedy', name: 'Entretenimiento & Humor' },
-  { id: 'horror', name: 'Misterio & Terror' },
 ];
 
 export const SUBGENRES: Record<string, string[]> = {
-  educational: ['Tendencia IA', 'Tutorial Express', 'Curiosidades', 'Ciencia'],
-  marketing: ['Caso de Éxito', 'Noticia de Mercado', 'Marca Personal', 'Demo de Producto'],
-  documentary: ['Investigación Viral', 'Biografía', 'Geopolítica', 'Naturaleza'],
-  motivational: ['Productividad', 'Mentalidad', 'Hábitos Atómicos', 'Liderazgo'],
-  fiction: ['Sci-Fi', 'Misterio', 'Drama', 'Acción'],
-  religious: ['Historia Antigua', 'Reflexión', 'Sabiduría Clásica', 'Relato Bíblico'],
-  comedy: ['Sátira Viral', 'Sketch', 'Parodia', 'Observacional'],
-  horror: ['Caso Misterioso', 'Paranormal', 'Psicológico', 'Leyenda Urbana'],
+  horror: [
+    'Leyendas Urbanas & Encuentros Reales',
+    'Expedientes Desclasificados & Sin Resolver',
+    'Llamadas al 911 / Grabaciones Inquietantes',
+    'Lugares Malditos & Exploración Paranormal',
+    'Relatos de la Noche & Testimonios',
+    'Creepypastas & Folclore Oscuro',
+    'Misterios Inexplicables & Dross Style',
+  ],
+  documentary: ['Investigación Viral', 'Expediente Histórico', 'Misterios de Archivo', 'Caso Criminal'],
+  fiction: ['Terror Psicológico', 'Sci-Fi Oscuro', 'Suspenso', 'Fantasía Oscura'],
+  educational: ['Curiosidades Oscuras', 'Ciencia del Terror', 'Psicología del Miedo'],
+  marketing: ['Estrategia Viral', 'Storytelling de Impacto'],
+  motivational: ['Superación', 'Resiliencia'],
+  comedy: ['Comedia Negra', 'Parodia'],
 };
 
 export const DURATIONS = [
-  { id: '30s', name: '30 Segundos (Reel/Short)', type: 'short' },
-  { id: '60s', name: '60 Segundos (Viral Completo)', type: 'short' },
-  { id: '3m', name: '3 Minutos (Análisis)', type: 'long' },
-  { id: '5m', name: '5 Minutos (YouTube 16:9)', type: 'long' },
-  { id: '10m', name: '10 Minutos (Documental)', type: 'long' },
+  { id: '60s', name: '60s — Short / TikTok / Reel (9:16)', type: 'short' },
+  { id: '90s', name: '90s — Short Extendido (9:16)', type: 'short' },
+  { id: '3m', name: '3 Minutos — Documental YouTube (16:9)', type: 'long' },
+  { id: '5m', name: '5 Minutos — Expediente Largo (16:9)', type: 'long' },
+  { id: '8m', name: '8 Minutos — Historia Completa (16:9)', type: 'long' },
 ];
 
 export const VIDEO_STYLES: StyleTechnicalProfile[] = [
