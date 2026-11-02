@@ -116,15 +116,29 @@ export const ScriptStudioStep: React.FC<ScriptStudioStepProps> = ({
         actRole: act.actRole,
         visualDescription:
           existing?.visualDescription ||
-          (i === 0
-            ? 'Plano detalle en cámara lenta: una ventana iluminada desde el exterior de noche. Corte rápido a la protagonista.'
-            : i === 1
-            ? 'La protagonista mira su teléfono en un pasillo oscuro. Reloj digital marcando las 9:15 PM. Tres golpes secos en la puerta.'
-            : i === 2
-            ? 'Plano subjetivo circular por la mirilla. Afuera un hombre agitado con ropa deportiva dando detalles familiares específicos.'
-            : i === 3
-            ? 'La mano se detiene antes de girar el cerrojo. Plano detalle de sus ojos dándose cuenta de que la acera exterior está vacía.'
-            : 'Plano exterior de la casa en penumbra. Una sombra difusa retrocede lentamente hacia los árboles.'),
+          (aspectRatio === '16:9'
+            ? (i === 0
+              ? 'Widescreen 16:9: Interior de ambulancia con equipo médico y torretas de emergencia rojas titilando a través del parabrisas en niebla densa.'
+              : i === 1
+              ? 'Widescreen 16:9: Plano general atmosférico de la base de emergencias con lluvia incesante sobre el asfalto mojado a medianoche.'
+              : i === 2
+              ? 'Widescreen 16:9: Paramédicos en la cabina en silencio mientras la estática de la radio CB emite una llamada urgente a las 3:15 AM.'
+              : i === 3
+              ? 'Widescreen 16:9: La ambulancia avanzando solitaria por la carretera de curvas entre las montañas, luces de emergencia cortando la oscuridad.'
+              : i === 4
+              ? 'Widescreen 16:9: Llegada al lugar del siniestro: un vehículo destrozado entre los árboles, puertas abiertas pero la cabina está desierta.'
+              : i === 5
+              ? 'Widescreen 16:9: Plano medio del paramédico iluminando con su linterna una silueta inmóvil que observa desde el borde del barranco.'
+              : 'Widescreen 16:9: La ambulancia alejándose lentamente por la carretera solitaria en penumbra antes de la primera luz del amanecer.')
+            : (i === 0
+              ? 'Plano detalle en cámara lenta: una ventana iluminada desde el exterior de noche. Corte rápido a la protagonista.'
+              : i === 1
+              ? 'La protagonista mira su teléfono en un pasillo oscuro. Reloj digital marcando las 9:15 PM. Tres golpes secos en la puerta.'
+              : i === 2
+              ? 'Plano subjetivo circular por la mirilla. Afuera un hombre agitado con ropa deportiva dando detalles familiares específicos.'
+              : i === 3
+              ? 'La mano se detiene antes de girar el cerrojo. Plano detalle de sus ojos dándose cuenta de que la acera exterior está vacía.'
+              : 'Plano exterior de la casa en penumbra. Una sombra difusa retrocede lentamente hacia los árboles.')),
         onScreenText:
           existing?.onScreenText ||
           (i === 0
@@ -407,9 +421,15 @@ export const ScriptStudioStep: React.FC<ScriptStudioStepProps> = ({
                 onClick={() => {
                   onSelectGenre('horror', 'Relatos de la Noche & Testimonios');
                   if (!prompt || prompt.trim().length === 0) {
-                    onChangePrompt(
-                      'Turno nocturno: Una guardia solitaria en una clínica a las 3:15 AM cuando tocan la puerta cerrada...'
-                    );
+                    if (aspectRatio === '16:9') {
+                      onChangePrompt(
+                        'Turno nocturno como paramédico: Accidente en carretera desierta a las 3:15 AM. Al llegar al vehículo destrozado, encontramos las puertas abiertas y una silueta que observa inmóvil desde el borde del barranco.'
+                      );
+                    } else {
+                      onChangePrompt(
+                        'Turno nocturno: Una guardia solitaria en una clínica a las 3:15 AM cuando tocan la puerta cerrada...'
+                      );
+                    }
                   }
                   handleApplyFiveActTemplate();
                 }}

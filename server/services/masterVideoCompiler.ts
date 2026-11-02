@@ -6,7 +6,12 @@ import { promisify } from 'util';
 import { AspectRatioType, Scene, SubtitleStyleType, WordTiming } from '../../src/types.ts';
 import { MEDIA_DIR, resolveMediaUrlToDiskPath } from '../storage/localDb.ts';
 import { resolveLocalToolPath } from './systemTools.ts';
-import { probeAudioDurationSec, computeSceneWordTimings, rebuildMasterFromSceneAudios } from './voiceEngine.ts';
+import {
+  probeAudioDurationSec,
+  computeSceneWordTimings,
+  rebuildMasterFromSceneAudios,
+  buildSyncedSrtFromScenes,
+} from './voiceEngine.ts';
 import { mixVoiceAndMusicWithDucking, mixMultiTrackAudio } from './audioMixer.ts';
 
 const execFileAsync = promisify(execFile);
@@ -17,6 +22,7 @@ export interface RenderJobProgress {
   progress: number; // 0 to 100
   stage: string;
   videoUrl?: string;
+  srtUrl?: string;
   durationSec?: number;
   fileSizeMb?: number;
   error?: string;
@@ -233,7 +239,7 @@ async function renderSceneSegment(params: {
       '-an',
       outputPath,
     ];
-    await execFileAsync(ffmpegPath, args, { timeout: 60_000 });
+    await execFileAsync(ffmpegPath, args, { timeout: 120_000 });
     return;
   }
 
@@ -244,37 +250,37 @@ async function renderSceneSegment(params: {
     const speedMult =
       intensity === 'subtle' ? 0.6 : intensity === 'dynamic' ? 1.5 : intensity === 'aggressive' ? 2.2 : 1.0;
 
-    let zoomExpr = `min(zoom+${(0.0016 * speedMult).toFixed(4)},1.25)`;
+    let zoomExpr = `1.0+${(0.07 * speedMult).toFixed(4)}*(on/${totalFrames})`;
     let xExpr = `iw/2-(iw/zoom/2)`;
     let yExpr = `ih/2-(ih/zoom/2)`;
 
     if (motion === 'zoom_out') {
-      zoomExpr = `if(lte(zoom,1.0),1.22,max(1.001,zoom-${(0.0016 * speedMult).toFixed(4)}))`;
+      zoomExpr = `1.08-${(0.07 * speedMult).toFixed(4)}*(on/${totalFrames})`;
     } else if (motion === 'pan_right') {
-      zoomExpr = `1.15`;
-      xExpr = `if(lte(on,1),(iw-iw/zoom)/2,min(iw-iw/zoom,x+${(1.4 * speedMult).toFixed(2)}))`;
+      zoomExpr = `1.10`;
+      xExpr = `((iw-iw/zoom)*0.2)+((iw-iw/zoom)*0.6)*(on/${totalFrames})`;
     } else if (motion === 'pan_left') {
-      zoomExpr = `1.15`;
-      xExpr = `if(lte(on,1),(iw-iw/zoom)/2,max(0,x-${(1.4 * speedMult).toFixed(2)}))`;
+      zoomExpr = `1.10`;
+      xExpr = `((iw-iw/zoom)*0.8)-((iw-iw/zoom)*0.6)*(on/${totalFrames})`;
     } else if (motion === 'pan_up') {
-      zoomExpr = `1.15`;
-      yExpr = `if(lte(on,1),(ih-ih/zoom)/2,max(0,y-${(1.4 * speedMult).toFixed(2)}))`;
+      zoomExpr = `1.10`;
+      yExpr = `((ih-ih/zoom)*0.8)-((ih-ih/zoom)*0.6)*(on/${totalFrames})`;
     } else if (motion === 'pan_down') {
-      zoomExpr = `1.15`;
-      yExpr = `if(lte(on,1),(ih-ih/zoom)/2,min(ih-ih/zoom,y+${(1.4 * speedMult).toFixed(2)}))`;
+      zoomExpr = `1.10`;
+      yExpr = `((ih-ih/zoom)*0.2)+((ih-ih/zoom)*0.6)*(on/${totalFrames})`;
     } else if (motion === 'dolly_zoom') {
-      zoomExpr = `min(1.0+${(0.0028 * speedMult).toFixed(4)}*on,1.35)`;
+      zoomExpr = `1.0+${(0.10 * speedMult).toFixed(4)}*(on/${totalFrames})`;
       yExpr = `ih/2-(ih/zoom/2)`;
     } else if (motion === 'orbital_drift') {
-      zoomExpr = `1.12+${(0.0010 * speedMult).toFixed(4)}*on`;
-      xExpr = `iw/2-(iw/zoom/2)+sin(2*PI*on/${totalFrames})*${(18 * speedMult).toFixed(1)}`;
-      yExpr = `ih/2-(ih/zoom/2)+cos(2*PI*on/${totalFrames})*${(14 * speedMult).toFixed(1)}`;
+      zoomExpr = `1.08+${(0.02 * speedMult).toFixed(4)}*(on/${totalFrames})`;
+      xExpr = `iw/2-(iw/zoom/2)+sin(2*PI*on/${totalFrames})*${(14 * speedMult).toFixed(1)}`;
+      yExpr = `ih/2-(ih/zoom/2)+cos(2*PI*on/${totalFrames})*${(10 * speedMult).toFixed(1)}`;
     } else if (motion === 'pulse') {
-      zoomExpr = `1.08+${(0.06 * speedMult).toFixed(3)}*sin(2*PI*on/${totalFrames})`;
+      zoomExpr = `1.05+${(0.04 * speedMult).toFixed(3)}*sin(2*PI*on/${totalFrames})`;
     } else if (motion === 'shake_horror') {
-      zoomExpr = `1.12`;
-      xExpr = `iw/2-(iw/zoom/2)+sin(on*3.8)*${(9 * speedMult).toFixed(1)}`;
-      yExpr = `ih/2-(ih/zoom/2)+cos(on*4.6)*${(7 * speedMult).toFixed(1)}`;
+      zoomExpr = `1.08`;
+      xExpr = `iw/2-(iw/zoom/2)+sin(on*3.8)*${(7 * speedMult).toFixed(1)}`;
+      yExpr = `ih/2-(ih/zoom/2)+cos(on*4.6)*${(5 * speedMult).toFixed(1)}`;
     }
 
     const filter = `zoompan=z='${zoomExpr}':x='${xExpr}':y='${yExpr}':d=${totalFrames}:s=${targetWidth}x${targetHeight}:fps=30`;
@@ -299,7 +305,7 @@ async function renderSceneSegment(params: {
       '-an',
       outputPath,
     ];
-    await execFileAsync(ffmpegPath, args, { timeout: 60_000 });
+    await execFileAsync(ffmpegPath, args, { timeout: 120_000 });
     return;
   }
 
@@ -563,6 +569,17 @@ export async function compileMasterVideo(params: {
 
     const fileStat = fs.statSync(finalOutputPath);
     const fileSizeMb = Number((fileStat.size / (1024 * 1024)).toFixed(2));
+
+    // Generate synchronized .SRT closed-captions sidecar for YouTube / social video
+    const srtFileName = outputFileName.replace(/\.mp4$/i, '.srt');
+    const srtOutputPath = path.join(videosDir, srtFileName);
+    try {
+      const srtText = buildSyncedSrtFromScenes(params.scenes);
+      fs.writeFileSync(srtOutputPath, srtText, 'utf-8');
+      job.srtUrl = `/media/videos/${srtFileName}`;
+    } catch (e) {
+      console.warn('Could not export SRT sidecar:', e);
+    }
 
     job.status = 'completed';
     job.progress = 100;

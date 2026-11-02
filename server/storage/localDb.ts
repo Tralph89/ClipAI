@@ -336,6 +336,11 @@ export function resolveMediaUrlToDiskPath(mediaUrl?: string): string | null {
     const fullPath = path.join(MEDIA_DIR, rel);
     return fs.existsSync(fullPath) ? fullPath : null;
   }
+  if (mediaUrl.startsWith('/data/') || mediaUrl.startsWith('data/')) {
+    const rel = mediaUrl.replace(/^\/?data\//, '').replace(/\.\./g, '');
+    const fullPath = path.join(DATA_DIR, rel);
+    if (fs.existsSync(fullPath)) return fullPath;
+  }
   if (mediaUrl.startsWith('/music/')) {
     const rel = mediaUrl.replace(/^\/music\//, '').replace(/\.\./g, '');
     const fullPath = path.join(DATA_DIR, 'music', rel);
@@ -346,6 +351,10 @@ export function resolveMediaUrlToDiskPath(mediaUrl?: string): string | null {
     const fullPath = path.join(DATA_DIR, 'sfx', rel);
     return fs.existsSync(fullPath) ? fullPath : null;
   }
+
+  const relRoot = path.resolve(process.cwd(), mediaUrl.replace(/^\//, ''));
+  if (fs.existsSync(relRoot)) return relRoot;
+
   return null;
 }
 

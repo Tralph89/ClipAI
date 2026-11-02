@@ -68,28 +68,28 @@ function getDurationTargets(duration: string, aspectRatio: AspectRatioType): {
       };
     case '3m':
       return {
-        exactTargetScenes: 12,
-        minScenes: 10,
-        maxScenes: 15,
-        targetWords: '400 a 460 palabras en total',
-        wordsPerScene: '28 a 38 palabras por escena',
+        exactTargetScenes: 7,
+        minScenes: 7,
+        maxScenes: 7,
+        targetWords: '380 a 450 palabras en total (~7 bloques episódicos de ~25s cada uno a ritmo pausado)',
+        wordsPerScene: '45 a 65 palabras por escena',
       };
     case '5m':
       return {
-        exactTargetScenes: 20,
-        minScenes: 18,
-        maxScenes: 24,
-        targetWords: '720 a 800 palabras en total',
-        wordsPerScene: '30 a 40 palabras por escena',
+        exactTargetScenes: 7,
+        minScenes: 7,
+        maxScenes: 7,
+        targetWords: '650 a 750 palabras en total (~7 bloques episódicos de ~40-45s cada uno)',
+        wordsPerScene: '80 a 105 palabras por escena',
       };
     case '8m':
     case '10m':
       return {
-        exactTargetScenes: 35,
-        minScenes: 30,
-        maxScenes: 40,
-        targetWords: '1150 a 1250 palabras en total',
-        wordsPerScene: '30 a 40 palabras por escena',
+        exactTargetScenes: 7,
+        minScenes: 7,
+        maxScenes: 7,
+        targetWords: '1050 a 1250 palabras en total (~7 bloques episódicos de ~65-70s cada uno)',
+        wordsPerScene: '140 a 180 palabras por escena',
       };
     default:
       return aspectRatio === '16:9'
@@ -262,8 +262,13 @@ export async function generateStructuredViralScript(params: {
       (params.prompt && params.prompt.toLowerCase().includes('relatos de la noche'))
     );
 
-  const structuredPrompt = `Actúa como director creativo y showrunner galardonado de videos virales de alta retención para YouTube Shorts, TikTok y Facebook Reels.
-Diseña un guion cinematográfico estructurado en la "Fórmula de 5 Actos Virales" para un video en formato ${aspectRatio} de duración objetivo ${params.duration || '60s'} (${targets.targetWords}).
+  const formatLabel =
+    aspectRatio === '16:9'
+      ? 'episodio largo cinematográfico documental para YouTube (16:9 Widescreen)'
+      : `video vertical de alta retención para Reels, TikTok y YouTube Shorts (${aspectRatio})`;
+
+  const structuredPrompt = `Actúa como director creativo y showrunner galardonado de contenido narrativo audiovisual.
+Diseña un guion cinematográfico estructurado en la arquitectura de actos para un ${formatLabel} de duración objetivo ${params.duration || '60s'} (${targets.targetWords}).
 
 Datos del proyecto:
 - Categoría / Enfoque: ${params.genre} (${params.subgenre})
@@ -274,25 +279,26 @@ ${
   params.trendContext
     ? `\n### MATERIAL DE REFERENCIA / TRANSCRIPCIÓN COMPLETA DEL CASO:\n${params.trendContext}\n\nDIRECTIVAS DE ADAPTACIÓN:
 - Adapta esta historia preservando los detalles más aterradores, nombres reales, horas exactas (ej. 'las 9:15 PM'), detalles cotidianos y coartadas del testimonio original.
-- Distribuye la narrativa a lo largo de los 5 Actos Virales de forma progresiva (Gancho inicial -> Contexto e Ilusión -> La Fisura en la Coartada -> El Quiebre -> Cierre y Remate).`
+- Distribuye la narrativa a lo largo de los actos de forma progresiva.`
     : ''
 }
 ${
   isRelatos
-    ? `\n### DIRECTIVA ESPECIAL: ESTILO "RELATOS DE LA NOCHE" (URIEL REYES):
-- Cadencia de narración: Pausada, sobria, reflexiva y madura. Tono de radio nocturna íntima de terror testimonial.
-- Estructura del relato: Basado en testimonios humanos verosímiles (guardias nocturnas, carreteras desoladas, casas silenciosas, turnos de hospital, sucesos cotidianos perturbados por algo inexplicable).
-- Gancho (Acto 1): Frase inicial reflexiva que invite a escuchar en soledad (ej. "Hay experiencias que sólo se entienden cuando cae la medianoche...", "Quien nos comparte este testimonio nos pidió mantener su nombre en el anonimato...").
-- Tensión psicológica: Prohibido usar clichés exagerados o sustos infantiles. El miedo nace de la lentitud, de la soledad, de una sombra donde no debería haber nada y de la atmósfera nocturna.
-- Cierre (Acto 5): Remate escalofriante y reflexivo: "Si esta noche sientes que alguien te observa desde la esquina de la habitación... procura no abrir los ojos. Buenas noches."`
+    ? `\n### DIRECTIVA ESPECIAL: ESTILO OFICIAL "RELATOS DE LA NOCHE" (URIEL REYES):
+- Cadencia de narración: Pausada, sobria, reflexiva y madura. Tono de radio nocturna íntima de terror testimonial real.
+- Estructura episódica: Basada en testimonios humanos verosímiles (paramédicos en turnos nocturnos, carreteras desiertas, casetas de cobro, hospitales de madrugada, encuentros inexplicables).
+- Cold Open (Acto 1): Inicia "in media res" con el detalle más perturbador del caso antes de cualquier presentación formal (ej. "Colocamos con cuidado el cuerpo en la camioneta forense... cuando algo se movió ahí dentro.").
+- Bienvenida a la Comunidad (Acto 2 si aplica): "Bienvenidos a otro episodio de Relatos de la Noche, mi querida comunidad... Hoy nos subimos a ambulancias que recorren carreteras desoladas...".
+- Tensión psicológica y verosimilitud: Prohibido usar clichés de monstruos de película o sustos infantiles. El miedo nace de la lentitud, de la soledad en la guardia y de lo que no tiene explicación médica o lógica.
+- Cierre (Último Acto): Reflexión final y despedida sobria: "Si alguna vez viajas tarde por esa carretera y ves luces de emergencia a lo lejos... no te detengas. Buenas noches."`
     : ''
 }
 
-ARQUITECTURA OBLIGATORIA DE LOS 5 ACTOS VIRALES:
+ARQUITECTURA OBLIGATORIA DE LOS ACTOS (${targets.exactTargetScenes} ESCENAS):
 ${actsGuideText}
 
 REGLAS ESTRICTAS DE REDACCIÓN Y PRODUCCIÓN AUDIOVISUAL:
-1. Genera exactamente las ${targets.exactTargetScenes} escenas correspondientes a los 5 Actos Virales. Cada escena debe contener los siguientes campos específicos:
+1. Genera exactamente las ${targets.exactTargetScenes} escenas correspondientes a la estructura de actos. Cada escena debe contener los siguientes campos específicos:
    - "timeRange": El rango de tiempo exacto (ej. "${fiveActs[0].timeRange}").
    - "actRole": El nombre del acto (ej. "${fiveActs[0].actRole}").
    - "title": Título descriptivo en español para el editor (ej. "Apertura en penumbra exterior").

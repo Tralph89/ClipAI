@@ -431,6 +431,168 @@ export interface FiveActTemplate {
   defaultIntensity: MotionIntensityType;
 }
 
+export function getRelatosLongFormStructure(duration: string = '3m'): FiveActTemplate[] {
+  switch (duration) {
+    case '5m':
+      return [
+        {
+          actRole: 'EL COLD OPEN (In Media Res)',
+          timeRange: '[0:00 - 0:40]',
+          pacingNote: 'Momento más escalofriante de la noche. Algo se mueve en la ambulancia o la silueta en la carretera antes de cualquier presentación.',
+          defaultMotion: 'zoom_in',
+          defaultIntensity: 'subtle',
+        },
+        {
+          actRole: 'BIENVENIDA A LA COMUNIDAD',
+          timeRange: '[0:41 - 1:20]',
+          pacingNote: 'Uriel Reyes saluda a la comunidad, presenta el oficio nocturno y advierte sobre testimonios reales.',
+          defaultMotion: 'pan_right',
+          defaultIntensity: 'subtle',
+        },
+        {
+          actRole: 'LA GUARDIA / EL CONTEXTO',
+          timeRange: '[1:21 - 2:10]',
+          pacingNote: 'Detalles verosímiles del turno de 24 horas: la base, lluvia torrencial, cansancio acumulado, café frío.',
+          defaultMotion: 'zoom_in',
+          defaultIntensity: 'subtle',
+        },
+        {
+          actRole: 'EL DESPACHO / EL TRAYECTO',
+          timeRange: '[2:11 - 3:00]',
+          pacingNote: 'Llamada de radio de código rojo. Torretas rojas y azules cortando la niebla en la carretera desierta.',
+          defaultMotion: 'dolly_zoom',
+          defaultIntensity: 'cinematic',
+        },
+        {
+          actRole: 'LA ANOMALÍA INEXPLICABLE',
+          timeRange: '[3:01 - 3:55]',
+          pacingNote: 'Llegada al lugar del siniestro. Vehículo volcado pero vacío, el testigo que no proyecta sombra o el cuerpo que ya no está.',
+          defaultMotion: 'orbital_drift',
+          defaultIntensity: 'cinematic',
+        },
+        {
+          actRole: 'EL REGRESO & LA CONFIRMACIÓN',
+          timeRange: '[3:56 - 4:35]',
+          pacingNote: 'Regreso a la base con sensación de persecución. Al revisar la bitácora descubren que el accidente ocurrió hace diez años.',
+          defaultMotion: 'pan_left',
+          defaultIntensity: 'subtle',
+        },
+        {
+          actRole: 'REMATE REFLEXIVO & DESPEDIDA',
+          timeRange: '[4:36 - 5:00]',
+          pacingNote: 'Cierre pausado y escalofriante de Uriel: "Si alguna vez viajas tarde por esa carretera... Buenas noches."',
+          defaultMotion: 'zoom_out',
+          defaultIntensity: 'subtle',
+        },
+      ];
+    case '8m':
+      return [
+        {
+          actRole: 'EL COLD OPEN (In Media Res)',
+          timeRange: '[0:00 - 1:00]',
+          pacingNote: 'Apertura directa con el suceso más aterrador del testimonio sin música introductoria previa.',
+          defaultMotion: 'zoom_in',
+          defaultIntensity: 'subtle',
+        },
+        {
+          actRole: 'BIENVENIDA A LA COMUNIDAD',
+          timeRange: '[1:01 - 2:00]',
+          pacingNote: 'Saludo oficial, reflexión sobre el terror cotidiano en turnos nocturnos.',
+          defaultMotion: 'pan_right',
+          defaultIntensity: 'subtle',
+        },
+        {
+          actRole: 'LA GUARDIA / EL CONTEXTO',
+          timeRange: '[2:01 - 3:20]',
+          pacingNote: 'Construcción profunda de la atmósfera: la base, la lluvia, los compañeros de turno.',
+          defaultMotion: 'zoom_in',
+          defaultIntensity: 'subtle',
+        },
+        {
+          actRole: 'EL DESPACHO / EL TRAYECTO',
+          timeRange: '[3:21 - 4:40]',
+          pacingNote: 'Alarma de código rojo, radio CB, el avance solitario en la carretera.',
+          defaultMotion: 'dolly_zoom',
+          defaultIntensity: 'cinematic',
+        },
+        {
+          actRole: 'LA ANOMALÍA INEXPLICABLE',
+          timeRange: '[4:41 - 6:00]',
+          pacingNote: 'El encuentro con lo imposible. La figura en el barranco, el niño que habla solo o el cadáver.',
+          defaultMotion: 'orbital_drift',
+          defaultIntensity: 'cinematic',
+        },
+        {
+          actRole: 'EL REGRESO & LA CONFIRMACIÓN',
+          timeRange: '[6:01 - 7:15]',
+          pacingNote: 'La huida, el reporte con la policía, la confirmación de lo paranormal.',
+          defaultMotion: 'pan_left',
+          defaultIntensity: 'subtle',
+        },
+        {
+          actRole: 'REMATE REFLEXIVO & DESPEDIDA',
+          timeRange: '[7:16 - 8:00]',
+          pacingNote: 'Reflexión final y despedida de Uriel a la comunidad.',
+          defaultMotion: 'zoom_out',
+          defaultIntensity: 'subtle',
+        },
+      ];
+    case '3m':
+    default:
+      return [
+        {
+          actRole: 'EL COLD OPEN (In Media Res)',
+          timeRange: '[0:00 - 0:25]',
+          pacingNote: 'Momento más escalofriante de la noche. Algo se mueve en la ambulancia o la silueta en la carretera.',
+          defaultMotion: 'zoom_in',
+          defaultIntensity: 'subtle',
+        },
+        {
+          actRole: 'BIENVENIDA A LA COMUNIDAD',
+          timeRange: '[0:26 - 0:50]',
+          pacingNote: 'Uriel Reyes saluda a la comunidad, presenta el caso de emergencias y advierte sobre testimonios reales.',
+          defaultMotion: 'pan_right',
+          defaultIntensity: 'subtle',
+        },
+        {
+          actRole: 'LA GUARDIA / EL CONTEXTO',
+          timeRange: '[0:51 - 1:20]',
+          pacingNote: 'Detalles verosímiles del turno: la estación solitaria, lluvia nocturna, cansancio.',
+          defaultMotion: 'zoom_in',
+          defaultIntensity: 'subtle',
+        },
+        {
+          actRole: 'EL DESPACHO / EL TRAYECTO',
+          timeRange: '[1:21 - 1:55]',
+          pacingNote: 'La alerta en la radio, el avance con sirenas y torretas rojas entre la niebla.',
+          defaultMotion: 'dolly_zoom',
+          defaultIntensity: 'cinematic',
+        },
+        {
+          actRole: 'LA ANOMALÍA INEXPLICABLE',
+          timeRange: '[1:56 - 2:30]',
+          pacingNote: 'Llegada al lugar. El auto destrozado pero vacío, la figura en la curva o el susurro en la camilla.',
+          defaultMotion: 'orbital_drift',
+          defaultIntensity: 'cinematic',
+        },
+        {
+          actRole: 'EL REGRESO & LA CONFIRMACIÓN',
+          timeRange: '[2:31 - 2:45]',
+          pacingNote: 'El regreso y el escalofrío: el parte oficial confirma que no hubo sobrevivientes en ese tramo desde hace años.',
+          defaultMotion: 'pan_left',
+          defaultIntensity: 'subtle',
+        },
+        {
+          actRole: 'REMATE REFLEXIVO & DESPEDIDA',
+          timeRange: '[2:46 - 3:00]',
+          pacingNote: 'Cierre pausado y escalofriante de Uriel Reyes: "Si viajas de noche por esa carretera... Buenas noches."',
+          defaultMotion: 'zoom_out',
+          defaultIntensity: 'subtle',
+        },
+      ];
+  }
+}
+
 export function getFiveActStructure(duration: string): FiveActTemplate[] {
   switch (duration) {
     case '30s':
@@ -509,6 +671,10 @@ export function getFiveActStructure(duration: string): FiveActTemplate[] {
           defaultIntensity: 'subtle',
         },
       ];
+    case '3m':
+    case '5m':
+    case '8m':
+      return getRelatosLongFormStructure(duration);
     case '60s':
     default:
       return [
