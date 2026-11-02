@@ -856,6 +856,7 @@ export interface LocalVideoClusterStatus {
   vramTotalMb: number;
   vramUsedMb: number;
   vramFreeMb: number;
+  preferredEngine?: LocalVideoEngineId;
   engines: {
     wan_comfyui: LocalVideoEngineInfo;
     ltx_local: LocalVideoEngineInfo;

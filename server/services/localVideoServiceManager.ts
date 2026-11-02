@@ -346,6 +346,7 @@ export async function getLocalVideoClusterStatus(): Promise<LocalVideoClusterSta
     vramTotalMb: gpu.vramTotalMb,
     vramUsedMb: gpu.vramUsedMb,
     vramFreeMb: gpu.vramFreeMb,
+    preferredEngine: db.settings.preferredLocalVideoEngine || 'wan_comfyui',
     engines: {
       wan_comfyui: wanInfo,
       ltx_local: ltxInfo,
