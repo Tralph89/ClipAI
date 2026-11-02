@@ -298,10 +298,23 @@ export function normalizeProjectMedia(project: Project): Project {
 }
 
 export function resolveMediaUrlToDiskPath(mediaUrl?: string): string | null {
-  if (!mediaUrl || !mediaUrl.startsWith('/media/')) return null;
-  const rel = mediaUrl.replace(/^\/media\//, '').replace(/\.\./g, '');
-  const fullPath = path.join(MEDIA_DIR, rel);
-  return fs.existsSync(fullPath) ? fullPath : null;
+  if (!mediaUrl) return null;
+  if (mediaUrl.startsWith('/media/')) {
+    const rel = mediaUrl.replace(/^\/media\//, '').replace(/\.\./g, '');
+    const fullPath = path.join(MEDIA_DIR, rel);
+    return fs.existsSync(fullPath) ? fullPath : null;
+  }
+  if (mediaUrl.startsWith('/music/')) {
+    const rel = mediaUrl.replace(/^\/music\//, '').replace(/\.\./g, '');
+    const fullPath = path.join(DATA_DIR, 'music', rel);
+    return fs.existsSync(fullPath) ? fullPath : null;
+  }
+  if (mediaUrl.startsWith('/sfx/')) {
+    const rel = mediaUrl.replace(/^\/sfx\//, '').replace(/\.\./g, '');
+    const fullPath = path.join(DATA_DIR, 'sfx', rel);
+    return fs.existsSync(fullPath) ? fullPath : null;
+  }
+  return null;
 }
 
 export function countStoredMediaFiles(): number {

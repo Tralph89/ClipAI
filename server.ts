@@ -18,6 +18,7 @@ import {
 import {
   ensureStorageDirectories,
   loadDb,
+  DATA_DIR,
   MEDIA_DIR,
   MediaSubfolder,
   normalizeProjectMedia,
@@ -44,6 +45,9 @@ import {
 import {
   generateStudioMusicTrackOnServer,
   mixVoiceAndMusicWithDucking,
+  mixMultiTrackAudio,
+  scanMusicLibrary,
+  scanSfxLibrary,
 } from './server/services/audioMixer.ts';
 import {
   acquireStockVideoForScene,
@@ -76,6 +80,8 @@ ensureStorageDirectories();
 
   app.use(express.json({ limit: '80mb' }));
   app.use('/media', express.static(MEDIA_DIR));
+  app.use('/music', express.static(path.join(DATA_DIR, 'music')));
+  app.use('/sfx', express.static(path.join(DATA_DIR, 'sfx')));
 
   function getOptionalGeminiClient(settings: AppSettings): GoogleGenAI | null {
     const apiKey =
@@ -859,6 +865,84 @@ Devuelve un JSON con esta estructura exacta:
     }
   });
 
+  // 5c. Real Studio Music Library Scanner & Custom Uploader
+  app.get('/api/music/library', async (_req, res) => {
+    try {
+      const items = await scanMusicLibrary();
+      res.json({ items });
+    } catch (error: any) {
+      console.error('Error scanning music library:', error);
+      res.status(500).json({ error: 'Error al escanear biblioteca de música.' });
+    }
+  });
+
+  app.post('/api/music/upload', async (req, res) => {
+    try {
+      const { base64, filename = 'uploaded_track.mp3' } = req.body || {};
+      if (!base64) {
+        return res.status(400).json({ error: 'Se requiere el contenido base64 del audio.' });
+      }
+      const customDir = path.join(DATA_DIR, 'music', 'custom');
+      fs.mkdirSync(customDir, { recursive: true });
+      const safeName = `${Date.now()}_${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const destPath = path.join(customDir, safeName);
+      const cleanBase64 = base64.replace(/^data:audio\/[^;]+;base64,/, '');
+      fs.writeFileSync(destPath, Buffer.from(cleanBase64, 'base64'));
+
+      const dur = await probeAudioDurationSec(destPath);
+      const item = {
+        id: `custom_${safeName.replace(/\.[^.]+$/, '')}`,
+        name: filename.replace(/\.[^.]+$/, '').replace(/_/g, ' '),
+        category: 'custom',
+        url: `/music/custom/${safeName}`,
+        durationSec: dur,
+      };
+      res.json({ item });
+    } catch (error: any) {
+      console.error('Error uploading custom music:', error);
+      res.status(500).json({ error: 'Error al guardar la pista personalizada.' });
+    }
+  });
+
+  // 5d. Sound Effects (SFX) & Continuous Ambient Foley Library Scanner
+  app.get('/api/sfx/library', async (_req, res) => {
+    try {
+      const items = await scanSfxLibrary();
+      res.json({ items });
+    } catch (error: any) {
+      console.error('Error scanning sfx library:', error);
+      res.status(500).json({ error: 'Error al escanear biblioteca de efectos de sonido.' });
+    }
+  });
+
+  // 5e. Advanced Multi-Track Audio Mixer (Voice + Ducked Music + Continuous Ambient + Limiter)
+  app.post('/api/audio/mix-multitrack', async (req, res) => {
+    try {
+      const {
+        voiceAudioUrl,
+        musicAudioUrl,
+        musicVolume = 0.18,
+        duckingPreset = 'balanced',
+        ambientAudioUrl,
+        ambientVolume = 0.12,
+      } = req.body || {};
+
+      const result = await mixMultiTrackAudio({
+        voiceAudioUrl,
+        musicAudioUrl,
+        musicVolume,
+        duckingPreset,
+        ambientAudioUrl,
+        ambientVolume,
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error in multi-track audio mix:', error);
+      res.status(500).json({ error: error.message || 'Error al procesar mezcla multipista de audio.' });
+    }
+  });
+
   app.post('/api/video/animate', async (_req, res) => {
     res.status(400).json({
       error:
@@ -900,6 +984,10 @@ Devuelve un JSON con esta estructura exacta:
         voiceAudioUrl,
         musicAudioUrl,
         mixedAudioUrl,
+        ambientAudioUrl,
+        musicVolume,
+        ambientVolume,
+        duckingPreset,
         subtitleStyle = 'hormozi',
         subtitlesEnabled = true,
         channelWatermark,
@@ -917,6 +1005,10 @@ Devuelve un JSON con esta estructura exacta:
         voiceAudioUrl,
         musicAudioUrl,
         mixedAudioUrl,
+        ambientAudioUrl,
+        musicVolume,
+        ambientVolume,
+        duckingPreset,
         subtitleStyle,
         subtitlesEnabled,
         channelWatermark,

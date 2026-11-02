@@ -72,11 +72,17 @@ export interface Scene {
   animatedUrl?: string;
   cameraMotion?: CameraMotionType;
   durationSec?: number;
+  startSec?: number;
+  endSec?: number;
   audioClipUrl?: string;
+  voiceAudioUrl?: string;
   audioTimings?: WordTiming[];
+  wordTimings?: WordTiming[];
   isGeneratingImage?: boolean;
   isAnimating?: boolean;
   isGeneratingAudio?: boolean;
+  isGeneratingVoice?: boolean;
+  sfxPresetId?: string;
   visualSeed?: number;
   renderedWithEngine?: string;
   // ComfyUI & Visual Coherence metadata
@@ -115,15 +121,49 @@ export interface VideoState {
   aspectRatio: AspectRatioType;
   language: string;
   voice: string;
+  voiceSpeed?: number;
   music: string;
-  voiceAudioUrl?: string;
   musicAudioUrl?: string;
+  musicVolume?: number;
+  duckingPreset?: 'subtle' | 'balanced' | 'aggressive' | 'none';
+  ambientPresetId?: string;
+  ambientAudioUrl?: string;
+  ambientVolume?: number;
+  voiceAudioUrl?: string;
+  mixedAudioUrl?: string;
   renderedVideoUrl?: string;
   subtitleStyle?: SubtitleStyleType;
   metadata?: VideoMetadata;
   subtitles?: string;
   visualBible?: VisualBible;
   comfyConfig?: ComfyUIConfig;
+}
+
+
+export interface MusicLibraryItem {
+  id: string;
+  name: string;
+  category: 'terror' | 'suspenso' | 'documental' | 'tech' | 'phonk' | 'custom';
+  url: string;
+  durationSec: number;
+  mood?: string;
+  author?: string;
+}
+
+export interface AmbientPreset {
+  id: string;
+  name: string;
+  description: string;
+  category: 'terror' | 'suspenso' | 'naturaleza';
+  url: string;
+}
+
+export interface SfxPreset {
+  id: string;
+  name: string;
+  description: string;
+  category: 'impact' | 'suspense' | 'creepy';
+  url: string;
 }
 
 export interface Project {

@@ -3,7 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { MEDIA_DIR, resolveMediaUrlToDiskPath } from '../storage/localDb.ts';
+import { DATA_DIR, MEDIA_DIR, resolveMediaUrlToDiskPath } from '../storage/localDb.ts';
 import { resolveLocalToolPath } from './systemTools.ts';
 import { probeAudioDurationSec } from './voiceEngine.ts';
 
@@ -367,4 +367,202 @@ export async function mixVoiceAndMusicWithDucking(params: {
     duckingApplied: ducking,
   };
 }
+
+/**
+ * Enhanced multi-track audio mixer:
+ * Unifies Voice Track + Ducked Background Music + Continuous Ambient Foley Layer.
+ */
+export async function mixMultiTrackAudio(params: {
+  voiceAudioUrl: string;
+  musicAudioUrl?: string;
+  musicVolume?: number;
+  duckingPreset?: 'subtle' | 'balanced' | 'aggressive' | 'none';
+  ambientAudioUrl?: string;
+  ambientVolume?: number;
+}): Promise<{
+  mixedAudioUrl: string;
+  durationSec: number;
+  tracksMixed: number;
+}> {
+  const voicePath = resolveMediaUrlToDiskPath(params.voiceAudioUrl);
+  if (!voicePath) {
+    throw new Error('No se encontró el archivo de locución en disco para mezclar.');
+  }
+
+  const musicPath = resolveMediaUrlToDiskPath(params.musicAudioUrl);
+  const ambientPath = resolveMediaUrlToDiskPath(params.ambientAudioUrl);
+
+  const ffmpegPath = resolveLocalToolPath('ffmpeg');
+  if (!ffmpegPath || (!musicPath && !ambientPath)) {
+    return {
+      mixedAudioUrl: params.voiceAudioUrl,
+      durationSec: await probeAudioDurationSec(voicePath),
+      tracksMixed: 1,
+    };
+  }
+
+  const voiceDur = await probeAudioDurationSec(voicePath);
+  const tailSec = 1.1;
+  const totalDur = Number((voiceDur + tailSec).toFixed(2));
+  const fadeOutStart = Math.max(0.2, Number((totalDur - 1.4).toFixed(2)));
+
+  const musicVol = Math.min(0.65, Math.max(0.02, Number(params.musicVolume) || 0.18));
+  const ambientVol = Math.min(0.50, Math.max(0.02, Number(params.ambientVolume) || 0.12));
+  const ducking = params.duckingPreset !== 'none';
+
+  const duckConfig = {
+    subtle: { ratio: 3, attack: 50, release: 450, thresh: 0.035 },
+    balanced: { ratio: 6, attack: 35, release: 380, thresh: 0.022 },
+    aggressive: { ratio: 12, attack: 20, release: 300, thresh: 0.015 },
+  }[params.duckingPreset || 'balanced'] || { ratio: 6, attack: 35, release: 380, thresh: 0.022 };
+
+  const audioDir = path.join(MEDIA_DIR, 'audio');
+  const outName = `multitrack_${Date.now()}_${crypto.randomBytes(3).toString('hex')}.mp3`;
+  const outPath = path.join(audioDir, outName);
+
+  const ffmpegArgs: string[] = ['-y', '-i', voicePath];
+  let inputIdx = 1;
+  const filterParts: string[] = [];
+  const mixInputs: string[] = ['[v_main]'];
+
+  if (musicPath && ducking) {
+    filterParts.push(`[0:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,apad=pad_dur=${tailSec},asplit=2[v_main][v_sc]`);
+  } else {
+    filterParts.push(`[0:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,apad=pad_dur=${tailSec}[v_main]`);
+  }
+
+  if (musicPath) {
+    ffmpegArgs.push('-stream_loop', '-1', '-i', musicPath);
+    const mIdx = inputIdx++;
+    if (ducking) {
+      filterParts.push(
+        `[${mIdx}:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:${totalDur},afade=t=in:st=0:d=0.6,afade=t=out:st=${fadeOutStart}:d=1.4,volume=${musicVol}[bgm_raw]`,
+        `[bgm_raw][v_sc]sidechaincompress=threshold=${duckConfig.thresh}:ratio=${duckConfig.ratio}:attack=${duckConfig.attack}:release=${duckConfig.release}:makeup=1[bgm_ducked]`
+      );
+      mixInputs.push('[bgm_ducked]');
+    } else {
+      filterParts.push(
+        `[${mIdx}:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:${totalDur},afade=t=in:st=0:d=0.6,afade=t=out:st=${fadeOutStart}:d=1.4,volume=${musicVol}[bgm_clean]`
+      );
+      mixInputs.push('[bgm_clean]');
+    }
+  }
+
+  if (ambientPath) {
+    ffmpegArgs.push('-stream_loop', '-1', '-i', ambientPath);
+    const aIdx = inputIdx++;
+    filterParts.push(
+      `[${aIdx}:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:${totalDur},afade=t=in:st=0:d=1.0,afade=t=out:st=${fadeOutStart}:d=1.5,volume=${ambientVol}[ambient_trk]`
+    );
+    mixInputs.push('[ambient_trk]');
+  }
+
+  filterParts.push(
+    `${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.96[aout]`
+  );
+
+  ffmpegArgs.push(
+    '-filter_complex', filterParts.join(';'),
+    '-map', '[aout]',
+    '-ar', '44100',
+    '-ac', '2',
+    '-c:a', 'libmp3lame',
+    '-b:a', '192k',
+    outPath
+  );
+
+  await execFileAsync(ffmpegPath, ffmpegArgs, { timeout: 60_000 });
+  const measuredDur = await probeAudioDurationSec(outPath);
+
+  return {
+    mixedAudioUrl: `/media/audio/${outName}`,
+    durationSec: measuredDur,
+    tracksMixed: mixInputs.length,
+  };
+}
+
+export interface ScannedMusicItem {
+  id: string;
+  name: string;
+  category: string;
+  url: string;
+  durationSec: number;
+}
+
+export async function scanMusicLibrary(): Promise<ScannedMusicItem[]> {
+  const libraryBase = path.join(DATA_DIR, 'music');
+  const items: ScannedMusicItem[] = [];
+
+  const scanDir = async (dir: string, category: string) => {
+    if (!fs.existsSync(dir)) return;
+    const files = fs.readdirSync(dir);
+    for (const file of files) {
+      const full = path.join(dir, file);
+      const stat = fs.statSync(full);
+      if (stat.isDirectory()) {
+        await scanDir(full, file);
+      } else if (/\.(mp3|wav|ogg|m4a|aac)$/i.test(file)) {
+        const id = `${category}_${file.replace(/\.[^.]+$/, '')}`;
+        const name = file
+          .replace(/\.[^.]+$/, '')
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+        const dur = await probeAudioDurationSec(full);
+        const relUrl = `/music/${path.relative(libraryBase, full).replace(/\\/g, '/')}`;
+        items.push({
+          id,
+          name,
+          category,
+          url: relUrl,
+          durationSec: dur,
+        });
+      }
+    }
+  };
+
+  await scanDir(libraryBase, 'general');
+  return items;
+}
+
+export interface ScannedSfxItem {
+  id: string;
+  name: string;
+  category: 'ambient' | 'hits';
+  url: string;
+  durationSec: number;
+}
+
+export async function scanSfxLibrary(): Promise<ScannedSfxItem[]> {
+  const sfxBase = path.join(DATA_DIR, 'sfx');
+  const items: ScannedSfxItem[] = [];
+
+  const scanDir = async (dir: string, category: 'ambient' | 'hits') => {
+    if (!fs.existsSync(dir)) return;
+    const files = fs.readdirSync(dir);
+    for (const file of files) {
+      const full = path.join(dir, file);
+      if (fs.statSync(full).isFile() && /\.(mp3|wav|ogg|m4a)$/i.test(file)) {
+        const id = `${category}_${file.replace(/\.[^.]+$/, '')}`;
+        const name = file
+          .replace(/\.[^.]+$/, '')
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+        const dur = await probeAudioDurationSec(full);
+        const relUrl = `/sfx/${path.relative(sfxBase, full).replace(/\\/g, '/')}`;
+        items.push({
+          id,
+          name,
+          category,
+          url: relUrl,
+          durationSec: dur,
+        });
+      }
+    }
+  };
+
+  await scanDir(path.join(sfxBase, 'ambient'), 'ambient');
+  await scanDir(path.join(sfxBase, 'hits'), 'hits');
+  return items;
+}
+
 

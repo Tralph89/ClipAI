@@ -13,6 +13,7 @@ import {
   Play,
   Pause,
   Volume2,
+  Mic,
   Music,
   Wand2,
   Image as ImageIcon,
@@ -79,6 +80,9 @@ import { TrendRadarView } from './components/TrendRadarView';
 import { ChannelsManagerView } from './components/ChannelsManagerView';
 import { CalendarHubView } from './components/CalendarHubView';
 import { VisualsStudioStep } from './components/VisualsStudioStep';
+import { VoiceStudioStep } from './components/VoiceStudioStep';
+import { MusicAndSfxStep } from './components/MusicAndSfxStep';
+import { renderMasterVideoOnServer } from './services/apiService';
 
 type WorkspaceTab = 'trends' | 'studio' | 'calendar' | 'channels';
 
@@ -141,12 +145,13 @@ const INITIAL_CURATED_TRENDS: TrendItem[] = [
 
 const STUDIO_STEPS = [
   { num: 1, label: '1. Guion Viral', icon: Sparkles },
-  { num: 2, label: '2. Voz & Música', icon: Volume2 },
-  { num: 3, label: '3. Visuales (ComfyUI)', icon: ImageIcon },
-  { num: 4, label: '4. Animación', icon: Film },
-  { num: 5, label: '5. Subtítulos', icon: Subtitles },
-  { num: 6, label: '6. Render & Exportar', icon: Download },
-  { num: 7, label: '7. Publicar Multi-Red', icon: Share2 },
+  { num: 2, label: '2. Locución por Escenas', icon: Mic },
+  { num: 3, label: '3. Música & SFX', icon: Music },
+  { num: 4, label: '4. Visuales (ComfyUI)', icon: ImageIcon },
+  { num: 5, label: '5. Animación', icon: Film },
+  { num: 6, label: '6. Subtítulos', icon: Subtitles },
+  { num: 7, label: '7. Render & Exportar', icon: Download },
+  { num: 8, label: '8. Publicar Multi-Red', icon: Share2 },
 ];
 
 function parseScriptIntoScenes(
@@ -970,6 +975,7 @@ export default function App() {
         aspectRatio: state.aspectRatio,
         voiceAudioUrl: state.voiceAudioUrl,
         musicAudioUrl: musicUrl,
+        mixedAudioUrl: state.mixedAudioUrl,
         subtitleStyle: state.subtitleStyle || 'hormozi',
         channelWatermark: activeChannel.handle,
         onProgress: (pct) => setRenderProgress(pct),
@@ -989,6 +995,57 @@ export default function App() {
       });
     } finally {
       setIsRenderingVideo(false);
+    }
+  };
+
+  const handleRenderMasterOnServer = async () => {
+    if (scenes.length === 0) {
+      setStatusMessage({
+        type: 'error',
+        text: 'Asegúrate de tener escenas generadas antes de compilar el video master.',
+      });
+      return;
+    }
+
+    setIsRenderingVideo(true);
+    setRenderProgress(10);
+    setStatusMessage({
+      type: 'info',
+      text: 'Compilando video master MP4 1080p en servidor local con FFmpeg y GPU NVENC...',
+    });
+
+    try {
+      const job = await renderMasterVideoOnServer({
+        scenes,
+        aspectRatio: state.aspectRatio,
+        voiceAudioUrl: state.voiceAudioUrl,
+        musicAudioUrl: state.musicAudioUrl,
+        mixedAudioUrl: state.mixedAudioUrl,
+        ambientAudioUrl: state.ambientAudioUrl,
+        musicVolume: state.musicVolume,
+        ambientVolume: state.ambientVolume,
+        duckingPreset: state.duckingPreset,
+        subtitleStyle: state.subtitleStyle || 'hormozi',
+        channelWatermark: activeChannel.handle,
+      });
+
+      if (job.videoUrl) {
+        const nextState = { ...state, renderedVideoUrl: job.videoUrl };
+        setState(nextState);
+        saveCurrentProjectSnapshot(nextState, scenes, prompt);
+        setStatusMessage({
+          type: 'success',
+          text: `¡Master MP4 1080p compilado exitosamente! Duración: ${job.durationSec || 0}s (${job.fileSizeMb || 0} MB).`,
+        });
+      }
+    } catch (err: any) {
+      setStatusMessage({
+        type: 'error',
+        text: err.message || 'Error al compilar master en servidor.',
+      });
+    } finally {
+      setIsRenderingVideo(false);
+      setRenderProgress(100);
     }
   };
 
@@ -1664,226 +1721,40 @@ export default function App() {
                       disabled={scenes.length === 0}
                       className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-2 cursor-pointer"
                     >
-                      Siguiente: Voz & Música <ChevronRight className="w-4 h-4" />
+                      Siguiente: Locución por Escenas <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* STEP 2: VOZ IA & MÚSICA */}
+            {/* STEP 2: LOCUCIÓN POR ESCENAS (VOICE STUDIO) */}
             {state.step === 2 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left: Gemini 3.8 TTS Voiceover */}
-                <div className="bg-[#11131C] border border-white/10 rounded-2xl p-6 space-y-5">
-                  <div>
-                    <span className="text-xs font-mono uppercase text-violet-400">
-                      Motor Gemini 3.8 Flash Lite TTS (Servidor)
-                    </span>
-                    <h2 className="text-lg font-bold text-white mt-0.5">
-                      Narración de Voz Neural
-                    </h2>
-                    <p className="text-xs text-zinc-400 mt-1">
-                      Selecciona el narrador para tu canal y genera el archivo de audio WAV real.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {VOICES.map((v) => {
-                      const selected = state.voice === v.id;
-                      const isPlaying = playingVoiceId === v.id;
-                      const isCloned = v.engine === 'xtts';
-                      return (
-                        <div
-                          key={v.id}
-                          onClick={() => setState((prev) => ({ ...prev, voice: v.id }))}
-                          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer select-none ${
-                            selected
-                              ? isCloned
-                                ? 'bg-red-950/40 border-red-500 text-white shadow-lg shadow-red-600/20'
-                                : 'bg-violet-600/20 border-violet-500 text-white shadow-lg shadow-violet-600/10'
-                              : isCloned
-                              ? 'bg-[#12080a] border-red-900/30 text-zinc-300 hover:border-red-700/50'
-                              : 'bg-[#090A0F] border-white/10 text-zinc-300 hover:border-white/20'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={(e) => handlePlayVoiceSample(e, v.id)}
-                                className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                                  isPlaying
-                                    ? isCloned
-                                      ? 'bg-red-600 border-red-400 text-white animate-pulse'
-                                      : 'bg-violet-600 border-violet-400 text-white animate-pulse'
-                                    : 'bg-white/5 border-white/10 hover:bg-white/15 text-zinc-300 hover:text-white'
-                                }`}
-                                title="Escuchar muestra de voz"
-                              >
-                                {isPlaying ? (
-                                  <Pause className="w-3.5 h-3.5" />
-                                ) : (
-                                  <Play className="w-3.5 h-3.5 fill-current" />
-                                )}
-                              </button>
-                              <div className="flex flex-col">
-                                <span className="font-bold text-sm">{v.name}</span>
-                                {isCloned && (
-                                  <span className="text-[10px] text-red-400 font-semibold tracking-wider uppercase">
-                                    Voz Clonada Local • Archivo Clasificado
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            {selected && (
-                              <CheckCircle2
-                                className={`w-4 h-4 flex-shrink-0 ${
-                                  isCloned ? 'text-red-400' : 'text-violet-400'
-                                }`}
-                              />
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-1 mt-2.5">
-                            {v.tags.map((t) => (
-                              <span
-                                key={t}
-                                className={`text-[10px] px-2 py-0.5 rounded font-medium ${
-                                  t === 'Voz Clonada'
-                                    ? 'bg-red-900/40 text-red-300 border border-red-700/40'
-                                    : 'bg-white/5 text-zinc-400'
-                                }`}
-                              >
-                                {t}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    onClick={handleGenerateVoiceover}
-                    disabled={isGeneratingVoice}
-                    className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {isGeneratingVoice ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        Generando Locución Neural WAV...
-                      </>
-                    ) : (
-                      <>
-                        <Volume2 className="w-4 h-4" />
-                        Generar Audio de Narración ({state.voice})
-                      </>
-                    )}
-                  </button>
-
-                  {state.voiceAudioUrl && (
-                    <div className="bg-[#090A0F] border border-emerald-500/30 rounded-xl p-4 space-y-2">
-                      <div className="flex items-center justify-between text-xs text-emerald-400 font-semibold">
-                        <span>Locución Lista (Audio WAV 24kHz)</span>
-                        <a
-                          href={state.voiceAudioUrl}
-                          download="narracion_clipai.wav"
-                          className="underline hover:text-white"
-                        >
-                          Descargar WAV
-                        </a>
-                      </div>
-                      <audio
-                        ref={voiceAudioRef}
-                        controls
-                        src={state.voiceAudioUrl}
-                        className="w-full h-10"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Right: Studio Background Music & Lyria 3 */}
-                <div className="bg-[#11131C] border border-white/10 rounded-2xl p-6 flex flex-col justify-between space-y-5">
-                  <div className="space-y-4">
-                    <div>
-                      <span className="text-xs font-mono uppercase text-emerald-400">
-                        Mezcla Musical & Ambiente
-                      </span>
-                      <h2 className="text-lg font-bold text-white mt-0.5">
-                        Música de Fondo Sincronizada
-                      </h2>
-                      <p className="text-xs text-zinc-400 mt-1">
-                        Elige una pista instrumental sintetizada al instante o genera un clip con Lyria 3.
-                      </p>
-                    </div>
-
-                    <div className="space-y-2.5">
-                      {STUDIO_MUSIC_PRESETS.map((track) => {
-                        const active = state.music === track.id;
-                        return (
-                          <button
-                            key={track.id}
-                            onClick={() => handleSelectStudioMusic(track.id)}
-                            className={`w-full p-3.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                              active
-                                ? 'bg-emerald-500/15 border-emerald-500 text-white'
-                                : 'bg-[#090A0F] border-white/10 text-zinc-300 hover:border-white/20'
-                            }`}
-                          >
-                            <div>
-                              <div className="text-xs font-bold">{track.name}</div>
-                              <div className="text-[11px] text-zinc-400">
-                                {track.mood} • <span className="font-mono">{track.tempo} BPM</span>
-                              </div>
-                            </div>
-                            <Music className="w-4 h-4 text-emerald-400 shrink-0" />
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <button
-                      onClick={handleGenerateLyriaMusic}
-                      disabled={isGeneratingMusic}
-                      className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <Sparkles className="w-4 h-4 text-violet-400" />
-                      {isGeneratingMusic
-                        ? 'Sintetizando Pista Musical...'
-                        : 'Generar Pista Original con IA (Lyria 3 / Sintetizador)'}
-                    </button>
-
-                    {state.musicAudioUrl && (
-                      <div className="bg-[#090A0F] border border-white/10 rounded-xl p-3.5 space-y-2">
-                        <span className="text-xs text-zinc-300 font-semibold block">
-                          Previsualización de Pista de Fondo:
-                        </span>
-                        <audio controls src={state.musicAudioUrl} className="w-full h-9" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-4 border-t border-white/10 flex justify-between">
-                    <button
-                      onClick={() => setState((prev) => ({ ...prev, step: 1 }))}
-                      className="px-4 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-semibold flex items-center gap-1 cursor-pointer"
-                    >
-                      <ChevronLeft className="w-4 h-4" /> Anterior
-                    </button>
-                    <button
-                      onClick={() => setState((prev) => ({ ...prev, step: 3 }))}
-                      className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold flex items-center gap-2 cursor-pointer"
-                    >
-                      Siguiente: Visuales (ComfyUI) <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <VoiceStudioStep
+                scenes={scenes}
+                state={state}
+                onUpdateScenes={setScenes}
+                onUpdateState={(patch) => setState((prev) => ({ ...prev, ...patch }))}
+                onPrevStep={() => setState((prev) => ({ ...prev, step: 1 }))}
+                onNextStep={() => setState((prev) => ({ ...prev, step: 3 }))}
+                onSetStatus={setStatusMessage}
+              />
             )}
 
-            {/* STEP 3: COMFYUI LOCAL GPU + BIBLIA VISUAL & COHERENCIA DE ESTILO */}
+            {/* STEP 3: BANDA SONORA & SFX (MUSIC & SOUND DESIGN) */}
             {state.step === 3 && (
+              <MusicAndSfxStep
+                scenes={scenes}
+                state={state}
+                onUpdateState={(patch) => setState((prev) => ({ ...prev, ...patch }))}
+                onPrevStep={() => setState((prev) => ({ ...prev, step: 3 }))}
+                onNextStep={() => setState((prev) => ({ ...prev, step: 5 }))}
+                onSetStatus={setStatusMessage}
+              />
+            )}
+
+            {/* STEP 4: COMFYUI LOCAL GPU + BIBLIA VISUAL & COHERENCIA DE ESTILO */}
+            {state.step === 4 && (
               <VisualsStudioStep
                 scenes={scenes}
                 selectedStyleId={state.style}
@@ -1905,13 +1776,13 @@ export default function App() {
                 onSyncVisualBibleWithAI={handleSyncVisualBibleWithAI}
                 onGenerateSingleScene={handleGenerateSingleSceneImage}
                 onGenerateAllScenes={handleGenerateAllSceneImages}
-                onPrevStep={() => setState((prev) => ({ ...prev, step: 2 }))}
-                onNextStep={() => setState((prev) => ({ ...prev, step: 4 }))}
+                onPrevStep={() => setState((prev) => ({ ...prev, step: 3 }))}
+                onNextStep={() => setState((prev) => ({ ...prev, step: 5 }))}
               />
             )}
 
-            {/* STEP 4: ANIMACIÓN DE ESCENAS (HÍBRIDO KEN BURNS + VEO) */}
-            {state.step === 4 && (
+            {/* STEP 5: ANIMACIÓN DE ESCENAS (HÍBRIDO KEN BURNS + VEO) */}
+            {state.step === 5 && (
               <div className="space-y-6">
                 <div className="bg-[#11131C] border border-white/10 rounded-2xl p-6">
                   <h2 className="text-lg font-bold text-white">
@@ -1995,13 +1866,13 @@ export default function App() {
 
                 <div className="flex justify-between">
                   <button
-                    onClick={() => setState((prev) => ({ ...prev, step: 3 }))}
+                    onClick={() => setState((prev) => ({ ...prev, step: 4 }))}
                     className="px-4 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-semibold flex items-center gap-1 cursor-pointer"
                   >
                     <ChevronLeft className="w-4 h-4" /> Anterior
                   </button>
                   <button
-                    onClick={() => setState((prev) => ({ ...prev, step: 5 }))}
+                    onClick={() => setState((prev) => ({ ...prev, step: 6 }))}
                     className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold flex items-center gap-2 cursor-pointer"
                   >
                     Siguiente: Subtítulos <ChevronRight className="w-4 h-4" />
@@ -2010,8 +1881,8 @@ export default function App() {
               </div>
             )}
 
-            {/* STEP 5: SUBTÍTULOS DINÁMICOS */}
-            {state.step === 5 && (
+            {/* STEP 6: SUBTÍTULOS DINÁMICOS */}
+            {state.step === 8 && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div className="lg:col-span-5 bg-[#11131C] border border-white/10 rounded-2xl p-6 space-y-5">
                   <div>
@@ -2124,13 +1995,13 @@ export default function App() {
 
                   <div className="pt-4 border-t border-white/10 flex justify-between">
                     <button
-                      onClick={() => setState((prev) => ({ ...prev, step: 4 }))}
+                      onClick={() => setState((prev) => ({ ...prev, step: 6 }))}
                       className="px-4 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-semibold flex items-center gap-1 cursor-pointer"
                     >
                       <ChevronLeft className="w-4 h-4" /> Anterior
                     </button>
                     <button
-                      onClick={() => setState((prev) => ({ ...prev, step: 6 }))}
+                      onClick={() => setState((prev) => ({ ...prev, step: 8 }))}
                       className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold flex items-center gap-2 cursor-pointer"
                     >
                       Siguiente: Renderizar Video <ChevronRight className="w-4 h-4" />
@@ -2140,8 +2011,8 @@ export default function App() {
               </div>
             )}
 
-            {/* STEP 6: EDITOR MASTER & EXPORTACIÓN DE VIDEO REAL */}
-            {state.step === 6 && (
+            {/* STEP 7: EDITOR MASTER & EXPORTACIÓN DE VIDEO REAL */}
+            {state.step === 8 && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Left: Interactive Monitor & Real Video Player */}
                 <div className="lg:col-span-6 bg-[#11131C] border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-between space-y-4">
@@ -2320,21 +2191,31 @@ export default function App() {
 
                     <div className="flex flex-col sm:flex-row gap-3">
                       <button
-                        onClick={handleRenderFinalVideo}
+                        onClick={handleRenderMasterOnServer}
                         disabled={isRenderingVideo}
-                        className="flex-1 py-3.5 px-5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-violet-600/20"
+                        className="flex-1 py-3.5 px-5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-violet-600/25 border border-violet-400/30"
                       >
                         {isRenderingVideo ? (
                           <>
                             <RefreshCw className="w-4 h-4 animate-spin" />
-                            Renderizando Video ({renderProgress}%)...
+                            Compilando Master GPU ({renderProgress}%)...
                           </>
                         ) : (
                           <>
-                            <Film className="w-4 h-4" />
-                            Renderizar Video Final (.webm)
+                            <Sparkles className="w-4 h-4 text-amber-300" />
+                            Compilar Master MP4 1080p (GPU NVENC)
                           </>
                         )}
+                      </button>
+
+                      <button
+                        onClick={handleRenderFinalVideo}
+                        disabled={isRenderingVideo}
+                        className="py-3.5 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 hover:text-white font-medium text-xs flex items-center justify-center gap-2 cursor-pointer border border-white/10"
+                        title="Renderizado alternativo en el navegador"
+                      >
+                        <Film className="w-4 h-4" />
+                        WebM Navegador
                       </button>
 
                       {state.renderedVideoUrl && (
@@ -2352,13 +2233,13 @@ export default function App() {
 
                   <div className="pt-4 border-t border-white/10 flex justify-between">
                     <button
-                      onClick={() => setState((prev) => ({ ...prev, step: 5 }))}
+                      onClick={() => setState((prev) => ({ ...prev, step: 6 }))}
                       className="px-4 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-semibold flex items-center gap-1 cursor-pointer"
                     >
                       <ChevronLeft className="w-4 h-4" /> Anterior
                     </button>
                     <button
-                      onClick={() => setState((prev) => ({ ...prev, step: 7 }))}
+                      onClick={() => setState((prev) => ({ ...prev, step: 8 }))}
                       className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold flex items-center gap-2 cursor-pointer"
                     >
                       Siguiente: Publicación Multi-Red <ChevronRight className="w-4 h-4" />
@@ -2368,8 +2249,8 @@ export default function App() {
               </div>
             )}
 
-            {/* STEP 7: MINIATURA, SEO & PUBLICACIÓN MULTI-RED */}
-            {state.step === 7 && (
+            {/* STEP 8: MINIATURA, SEO & PUBLICACIÓN MULTI-RED */}
+            {state.step === 8 && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Left: Thumbnail & Multi-Platform Copy Generator */}
                 <div className="lg:col-span-7 bg-[#11131C] border border-white/10 rounded-2xl p-6 space-y-5">

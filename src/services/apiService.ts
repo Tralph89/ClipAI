@@ -21,6 +21,7 @@ import {
   VideoMetadata,
   VisualModeType,
   WordTiming,
+  MusicLibraryItem,
 } from '../types';
 
 export interface BootstrapPayload {
@@ -705,6 +706,10 @@ export async function renderMasterVideoOnServer(params: {
   voiceAudioUrl?: string;
   musicAudioUrl?: string;
   mixedAudioUrl?: string;
+  ambientAudioUrl?: string;
+  musicVolume?: number;
+  ambientVolume?: number;
+  duckingPreset?: 'subtle' | 'balanced' | 'aggressive' | 'none';
   subtitleStyle?: SubtitleStyleType;
   subtitlesEnabled?: boolean;
   channelWatermark?: string;
@@ -766,3 +771,62 @@ export async function transcribeVideoUrl(url: string): Promise<VideoTranscriptio
   }
   return data;
 }
+
+export async function fetchMusicLibrary(): Promise<MusicLibraryItem[]> {
+  const res = await fetch('/api/music/library');
+  const data = await res.json();
+  return data.items || [];
+}
+
+export async function uploadCustomMusic(file: File): Promise<MusicLibraryItem> {
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  const res = await fetch('/api/music/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base64, filename: file.name }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Error al subir la pista de música.');
+  return data.item;
+}
+
+export async function fetchSfxLibrary(): Promise<{
+  ambient: { id: string; name: string; url: string; durationSec: number }[];
+  hits: { id: string; name: string; url: string; durationSec: number }[];
+}> {
+  const res = await fetch('/api/sfx/library');
+  const data = await res.json();
+  const all: any[] = data.items || [];
+  return {
+    ambient: all.filter((i) => i.category === 'ambient'),
+    hits: all.filter((i) => i.category === 'hits'),
+  };
+}
+
+export async function mixMultiTrackAudioApi(params: {
+  voiceAudioUrl: string;
+  musicAudioUrl?: string;
+  musicVolume?: number;
+  duckingPreset?: 'subtle' | 'balanced' | 'aggressive' | 'none';
+  ambientAudioUrl?: string;
+  ambientVolume?: number;
+}): Promise<{
+  mixedAudioUrl: string;
+  durationSec: number;
+  tracksMixed: number;
+}> {
+  const res = await fetch('/api/audio/mix-multitrack', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Error al mezclar pistas de audio.');
+  return data;
+}
+

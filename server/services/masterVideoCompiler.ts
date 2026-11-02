@@ -6,8 +6,8 @@ import { promisify } from 'util';
 import { AspectRatioType, Scene, SubtitleStyleType, WordTiming } from '../../src/types.ts';
 import { MEDIA_DIR, resolveMediaUrlToDiskPath } from '../storage/localDb.ts';
 import { resolveLocalToolPath } from './systemTools.ts';
-import { probeAudioDurationSec, computeSceneWordTimings } from './voiceEngine.ts';
-import { mixVoiceAndMusicWithDucking } from './audioMixer.ts';
+import { probeAudioDurationSec, computeSceneWordTimings, rebuildMasterFromSceneAudios } from './voiceEngine.ts';
+import { mixVoiceAndMusicWithDucking, mixMultiTrackAudio } from './audioMixer.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -313,6 +313,10 @@ export async function compileMasterVideo(params: {
   voiceAudioUrl?: string;
   musicAudioUrl?: string;
   mixedAudioUrl?: string;
+  ambientAudioUrl?: string;
+  musicVolume?: number;
+  ambientVolume?: number;
+  duckingPreset?: 'subtle' | 'balanced' | 'aggressive' | 'none';
   subtitleStyle?: SubtitleStyleType;
   subtitlesEnabled?: boolean;
   channelWatermark?: string;
@@ -343,8 +347,8 @@ export async function compileMasterVideo(params: {
     const aspectRatio = params.aspectRatio || '9:16';
     const { width: targetWidth, height: targetHeight } = getDimensions(aspectRatio);
 
-    // 1. Prepare Audio Master Track (Locución + Música con Ducking)
-    job.stage = 'Preparando pista de audio master con Ducking...';
+    // 1. Prepare Audio Master Track (Locución + Música + Ambiente con Sidechain Ducking)
+    job.stage = 'Preparando pista de audio master con Ducking multipista...';
     job.progress = 15;
     params.onProgress?.(15, job.stage);
 
@@ -353,17 +357,29 @@ export async function compileMasterVideo(params: {
       masterAudioPath = resolveMediaUrlToDiskPath(params.mixedAudioUrl);
     }
 
-    if (!masterAudioPath && params.voiceAudioUrl) {
-      if (params.musicAudioUrl) {
-        const duckedResult = await mixVoiceAndMusicWithDucking({
-          voiceAudioUrl: params.voiceAudioUrl,
+    let effectiveVoiceUrl = params.voiceAudioUrl;
+    if (!effectiveVoiceUrl && params.scenes && params.scenes.some((s) => s.voiceAudioUrl || s.audioClipUrl)) {
+      try {
+        const rebuilt = await rebuildMasterFromSceneAudios(params.scenes);
+        effectiveVoiceUrl = rebuilt.voiceAudioUrl;
+      } catch (err) {
+        console.warn('Could not rebuild master from scene audios:', err);
+      }
+    }
+
+    if (!masterAudioPath && effectiveVoiceUrl) {
+      if (params.musicAudioUrl || params.ambientAudioUrl) {
+        const duckedResult = await mixMultiTrackAudio({
+          voiceAudioUrl: effectiveVoiceUrl,
           musicAudioUrl: params.musicAudioUrl,
-          musicVolume: 0.22,
-          duckingEnabled: true,
+          musicVolume: typeof params.musicVolume === 'number' ? params.musicVolume : 0.18,
+          duckingPreset: params.duckingPreset || 'balanced',
+          ambientAudioUrl: params.ambientAudioUrl,
+          ambientVolume: typeof params.ambientVolume === 'number' ? params.ambientVolume : 0.12,
         });
         masterAudioPath = resolveMediaUrlToDiskPath(duckedResult.mixedAudioUrl);
       } else {
-        masterAudioPath = resolveMediaUrlToDiskPath(params.voiceAudioUrl);
+        masterAudioPath = resolveMediaUrlToDiskPath(effectiveVoiceUrl);
       }
     }
 
