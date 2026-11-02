@@ -1670,7 +1670,7 @@ export async function generateSceneWithWanComfyUI(params: {
     `${params.scene.title || 'Escena'}. ${(params.scene.dialogue || '').slice(0, 110)}`;
   const stylePrompt =
     STYLE_DESCRIPTIONS[params.style || 'cinematic'] || STYLE_DESCRIPTIONS.cinematic;
-  const fullPrompt = `${promptToUse}, ${stylePrompt}, cinematic 4k, smooth cinematic motion, masterpiece`;
+  const fullPrompt = `${promptToUse}, ${stylePrompt}, continuous slow cinematic camera drift, heavy rain falling, drifting volumetric fog, pulsating emergency strobe reflections on wet asphalt, smooth organic motion, 4k`;
   const seed =
     typeof params.seed === 'number' && params.seed > 0
       ? Math.floor(params.seed) % 2_000_000_000
@@ -1737,7 +1737,7 @@ export async function generateSceneWithWanComfyUI(params: {
       inputs: {
         width,
         height,
-        num_frames: 17,
+        num_frames: 33,
         noise_aug_strength: 0.02,
         start_latent_strength: 1.0,
         end_latent_strength: 1.0,
@@ -1775,7 +1775,7 @@ export async function generateSceneWithWanComfyUI(params: {
         model: ['9', 0],
         image_embeds: ['7', 0],
         text_embeds: ['2', 0],
-        steps: 10,
+        steps: 12,
         cfg: 3.5,
         shift: 5.0,
         seed,
@@ -1804,7 +1804,7 @@ export async function generateSceneWithWanComfyUI(params: {
         loop_count: 0,
         filename_prefix: 'wan21_clipai',
         format: 'video/h264-mp4',
-        pingpong: false,
+        pingpong: true,
         save_output: true,
       },
     },

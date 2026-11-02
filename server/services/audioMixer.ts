@@ -379,6 +379,8 @@ export async function mixMultiTrackAudio(params: {
   duckingPreset?: 'subtle' | 'balanced' | 'aggressive' | 'none';
   ambientAudioUrl?: string;
   ambientVolume?: number;
+  foleyAudioUrl?: string;
+  foleyVolume?: number;
 }): Promise<{
   mixedAudioUrl: string;
   durationSec: number;
@@ -391,9 +393,10 @@ export async function mixMultiTrackAudio(params: {
 
   const musicPath = resolveMediaUrlToDiskPath(params.musicAudioUrl);
   const ambientPath = resolveMediaUrlToDiskPath(params.ambientAudioUrl);
+  const foleyPath = resolveMediaUrlToDiskPath(params.foleyAudioUrl);
 
   const ffmpegPath = resolveLocalToolPath('ffmpeg');
-  if (!ffmpegPath || (!musicPath && !ambientPath)) {
+  if (!ffmpegPath || (!musicPath && !ambientPath && !foleyPath)) {
     return {
       mixedAudioUrl: params.voiceAudioUrl,
       durationSec: await probeAudioDurationSec(voicePath),
@@ -408,6 +411,7 @@ export async function mixMultiTrackAudio(params: {
 
   const musicVol = Math.min(0.65, Math.max(0.02, Number(params.musicVolume) || 0.18));
   const ambientVol = Math.min(0.50, Math.max(0.02, Number(params.ambientVolume) || 0.12));
+  const foleyVol = Math.min(0.50, Math.max(0.02, Number(params.foleyVolume) || 0.15));
   const ducking = params.duckingPreset !== 'none';
 
   const duckConfig = {
@@ -455,6 +459,15 @@ export async function mixMultiTrackAudio(params: {
       `[${aIdx}:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:${totalDur},afade=t=in:st=0:d=1.0,afade=t=out:st=${fadeOutStart}:d=1.5,volume=${ambientVol}[ambient_trk]`
     );
     mixInputs.push('[ambient_trk]');
+  }
+
+  if (foleyPath) {
+    ffmpegArgs.push('-stream_loop', '-1', '-i', foleyPath);
+    const fIdx = inputIdx++;
+    filterParts.push(
+      `[${fIdx}:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:${totalDur},afade=t=in:st=0:d=0.8,afade=t=out:st=${fadeOutStart}:d=1.5,volume=${foleyVol}[foley_trk]`
+    );
+    mixInputs.push('[foley_trk]');
   }
 
   filterParts.push(

@@ -341,8 +341,10 @@ export async function compileMasterVideo(params: {
   musicAudioUrl?: string;
   mixedAudioUrl?: string;
   ambientAudioUrl?: string;
+  foleyAudioUrl?: string;
   musicVolume?: number;
   ambientVolume?: number;
+  foleyVolume?: number;
   duckingPreset?: 'subtle' | 'balanced' | 'aggressive' | 'none';
   subtitleStyle?: SubtitleStyleType;
   subtitlesEnabled?: boolean;
@@ -395,7 +397,7 @@ export async function compileMasterVideo(params: {
     }
 
     if (!masterAudioPath && effectiveVoiceUrl) {
-      if (params.musicAudioUrl || params.ambientAudioUrl) {
+      if (params.musicAudioUrl || params.ambientAudioUrl || params.foleyAudioUrl) {
         const duckedResult = await mixMultiTrackAudio({
           voiceAudioUrl: effectiveVoiceUrl,
           musicAudioUrl: params.musicAudioUrl,
@@ -403,6 +405,8 @@ export async function compileMasterVideo(params: {
           duckingPreset: params.duckingPreset || 'balanced',
           ambientAudioUrl: params.ambientAudioUrl,
           ambientVolume: typeof params.ambientVolume === 'number' ? params.ambientVolume : 0.12,
+          foleyAudioUrl: params.foleyAudioUrl,
+          foleyVolume: typeof params.foleyVolume === 'number' ? params.foleyVolume : 0.14,
         });
         masterAudioPath = resolveMediaUrlToDiskPath(duckedResult.mixedAudioUrl);
       } else {
