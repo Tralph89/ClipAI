@@ -145,20 +145,52 @@ export async function generateSceneImage(
 }
 
 export async function animateSceneWithAI(
-  prompt: string,
-  imageUrl?: string,
-  aspectRatio: AspectRatioType = '9:16'
-): Promise<string> {
+  promptOrParams:
+    | string
+    | {
+        scene?: Scene;
+        prompt?: string;
+        imageUrl?: string;
+        aspectRatio?: AspectRatioType;
+        engine?: 'auto' | 'wan_comfyui' | 'ltx_local' | 'veo' | 'ken_burns_mp4';
+        cameraMotion?: CameraMotionType;
+        motionIntensity?: MotionIntensityType;
+        targetDurationSec?: number;
+      },
+  maybeImageUrl?: string,
+  maybeAspectRatio: AspectRatioType = '9:16'
+): Promise<{
+  videoClipUrl: string;
+  videoDataUrl: string;
+  posterImageUrl?: string;
+  durationSec?: number;
+  provider?: string;
+}> {
+  const payload =
+    typeof promptOrParams === 'string'
+      ? {
+          prompt: promptOrParams,
+          imageUrl: maybeImageUrl,
+          aspectRatio: maybeAspectRatio,
+        }
+      : promptOrParams;
+
   const response = await fetch('/api/video/animate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, imageUrl, aspectRatio }),
+    body: JSON.stringify(payload),
   });
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error || 'No se pudo animar la escena con Veo.');
+    throw new Error(data.error || 'No se pudo animar la escena.');
   }
-  return data.videoDataUrl;
+  return {
+    videoClipUrl: data.videoClipUrl || data.videoDataUrl,
+    videoDataUrl: data.videoDataUrl || data.videoClipUrl,
+    posterImageUrl: data.posterImageUrl,
+    durationSec: data.durationSec,
+    provider: data.provider,
+  };
 }
 
 export async function generateMusicWithLyria(

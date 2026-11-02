@@ -302,7 +302,27 @@ export function normalizeProjectMedia(project: Project): Project {
 }
 
 export function resolveMediaUrlToDiskPath(mediaUrl?: string): string | null {
-  if (!mediaUrl) return null;
+  if (!mediaUrl || typeof mediaUrl !== 'string') return null;
+
+  // Direct disk path check
+  if (fs.existsSync(mediaUrl)) {
+    return path.resolve(mediaUrl);
+  }
+
+  // Base64 Data URLs: persist to local disk media directory immediately
+  if (mediaUrl.startsWith('data:image/')) {
+    const saved = saveDataUrlToMedia(mediaUrl, 'images', `img_${Date.now()}`);
+    return resolveMediaUrlToDiskPath(saved);
+  }
+  if (mediaUrl.startsWith('data:video/')) {
+    const saved = saveDataUrlToMedia(mediaUrl, 'videos', `vid_${Date.now()}`);
+    return resolveMediaUrlToDiskPath(saved);
+  }
+  if (mediaUrl.startsWith('data:audio/')) {
+    const saved = saveDataUrlToMedia(mediaUrl, 'audio', `aud_${Date.now()}`);
+    return resolveMediaUrlToDiskPath(saved);
+  }
+
   if (mediaUrl.startsWith('/media/')) {
     const rel = mediaUrl.replace(/^\/media\//, '').replace(/\.\./g, '');
     const fullPath = path.join(MEDIA_DIR, rel);

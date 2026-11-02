@@ -57,6 +57,7 @@ import {
   downloadAndNormalizeStockVideo,
   fetchPixabayStockImage,
   generateAndCacheSceneImage,
+  generateKenBurnsSceneClip,
   generateSceneLocalVideo,
   generateVisualsForAllScenes,
   searchFreeStockVideos,
@@ -1059,11 +1060,96 @@ Devuelve un JSON con esta estructura exacta:
     }
   });
 
-  app.post('/api/video/animate', async (_req, res) => {
-    res.status(400).json({
-      error:
-        'Se aplicará animación fluida Ken Burns (en Sección 5 se renderizará a 60fps en MP4 con FFmpeg local).',
-    });
+  // 5e. Scene Video Animation Orchestrator (Wan 2.1 ComfyUI / LTX 2.3 RTX 5090 / Ken Burns MP4)
+  app.post('/api/video/animate', async (req, res) => {
+    try {
+      const {
+        scene,
+        prompt,
+        imageUrl,
+        aspectRatio = '9:16',
+        engine = 'auto',
+        cameraMotion = 'zoom_in',
+        motionIntensity = 'cinematic',
+        targetDurationSec,
+      } = req.body || {};
+
+      const sceneObj: Scene = scene || {
+        title: prompt || 'Escena animada',
+        dialogue: '',
+        imageUrl,
+        imagePrompt: prompt,
+        cameraMotion,
+        motionIntensity,
+        durationSec: targetDurationSec || 5,
+      };
+
+      if (!sceneObj.imageUrl && imageUrl) {
+        sceneObj.imageUrl = imageUrl;
+      }
+      if (cameraMotion) sceneObj.cameraMotion = cameraMotion;
+      if (motionIntensity) sceneObj.motionIntensity = motionIntensity;
+
+      // 1. If explicit Wan 2.1 or LTX 2.3 requested
+      if (engine === 'wan_comfyui' || engine === 'ltx_local') {
+        const localVid = await generateSceneLocalVideo({
+          scene: sceneObj,
+          aspectRatio,
+          engine,
+          targetDurationSec,
+        });
+        return res.json({
+          videoDataUrl: localVid.videoClipUrl,
+          videoClipUrl: localVid.videoClipUrl,
+          posterImageUrl: localVid.posterImageUrl,
+          durationSec: localVid.durationSec,
+          provider: localVid.provider,
+        });
+      }
+
+      // 2. If 'auto' requested, check if a local GPU video engine is online
+      if (engine === 'auto') {
+        try {
+          const cluster = await getLocalVideoClusterStatus();
+          const onlineEngine = cluster.engines.find((e) => e.status === 'ready' || e.status === 'busy');
+          if (onlineEngine) {
+            const localVid = await generateSceneLocalVideo({
+              scene: sceneObj,
+              aspectRatio,
+              engine: onlineEngine.id,
+              targetDurationSec,
+            });
+            return res.json({
+              videoDataUrl: localVid.videoClipUrl,
+              videoClipUrl: localVid.videoClipUrl,
+              posterImageUrl: localVid.posterImageUrl,
+              durationSec: localVid.durationSec,
+              provider: localVid.provider,
+            });
+          }
+        } catch {
+          // fallback to Ken Burns MP4
+        }
+      }
+
+      // 3. Fast high-quality Ken Burns 60fps MP4 scene clip via local FFmpeg
+      const clip = await generateKenBurnsSceneClip({
+        scene: sceneObj,
+        aspectRatio,
+        targetDurationSec,
+      });
+
+      res.json({
+        videoDataUrl: clip.videoClipUrl,
+        videoClipUrl: clip.videoClipUrl,
+        posterImageUrl: clip.posterImageUrl,
+        durationSec: clip.durationSec,
+        provider: clip.provider,
+      });
+    } catch (error: any) {
+      console.error('Error animating scene:', error);
+      res.status(500).json({ error: error.message || 'Error al animar la escena.' });
+    }
   });
 
   // 6. Frame-Accurate Subtitles (.SRT) from Measured Scene Timings (or AI Fallback)

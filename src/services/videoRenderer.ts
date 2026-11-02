@@ -172,23 +172,56 @@ export function drawSceneFrameOnCanvas(
     typeof HTMLVideoElement !== 'undefined' && mediaElement instanceof HTMLVideoElement;
 
   const motion: CameraMotionType = scene.cameraMotion || 'zoom_in';
+  const intensity = scene.motionIntensity || 'cinematic';
+  const intensityMult =
+    intensity === 'subtle' ? 0.6 : intensity === 'dynamic' ? 1.5 : intensity === 'aggressive' ? 2.2 : 1.0;
+
   let scale = isVideoClip ? 1.02 : 1.08;
   let offsetX = 0;
   let offsetY = 0;
+  let rotationRad = 0;
 
   if (!isVideoClip) {
-    if (motion === 'zoom_in') {
-      scale = 1.0 + sceneProgress * 0.16;
-    } else if (motion === 'zoom_out') {
-      scale = 1.18 - sceneProgress * 0.16;
-    } else if (motion === 'pan_right') {
-      scale = 1.15;
-      offsetX = (sceneProgress - 0.5) * canvasWidth * 0.1;
-    } else if (motion === 'pan_left') {
-      scale = 1.15;
-      offsetX = (0.5 - sceneProgress) * canvasWidth * 0.1;
-    } else if (motion === 'pulse') {
-      scale = 1.06 + Math.sin(sceneProgress * Math.PI * 2) * 0.05;
+    switch (motion) {
+      case 'zoom_in':
+        scale = 1.0 + sceneProgress * 0.16 * intensityMult;
+        break;
+      case 'zoom_out':
+        scale = 1.0 + (1.0 - sceneProgress) * 0.16 * intensityMult;
+        break;
+      case 'pan_right':
+        scale = 1.15;
+        offsetX = (sceneProgress - 0.5) * canvasWidth * 0.12 * intensityMult;
+        break;
+      case 'pan_left':
+        scale = 1.15;
+        offsetX = (0.5 - sceneProgress) * canvasWidth * 0.12 * intensityMult;
+        break;
+      case 'pan_up':
+        scale = 1.15;
+        offsetY = (0.5 - sceneProgress) * canvasHeight * 0.12 * intensityMult;
+        break;
+      case 'pan_down':
+        scale = 1.15;
+        offsetY = (sceneProgress - 0.5) * canvasHeight * 0.12 * intensityMult;
+        break;
+      case 'dolly_zoom':
+        scale = 1.0 + Math.pow(sceneProgress, 1.4) * 0.28 * intensityMult;
+        offsetY = (Math.pow(sceneProgress, 1.2) - 0.5) * canvasHeight * 0.05 * intensityMult;
+        break;
+      case 'orbital_drift':
+        scale = 1.12 + sceneProgress * 0.08 * intensityMult;
+        rotationRad = (sceneProgress - 0.5) * 0.045 * intensityMult;
+        offsetX = Math.sin(sceneProgress * Math.PI) * canvasWidth * 0.04 * intensityMult;
+        break;
+      case 'pulse':
+        scale = 1.06 + Math.sin(sceneProgress * Math.PI * 2) * 0.06 * intensityMult;
+        break;
+      case 'shake_horror':
+        scale = 1.12;
+        offsetX = (Math.sin(sceneProgress * 60) * 0.6 + (Math.random() - 0.5) * 0.8) * 12 * intensityMult;
+        offsetY = (Math.cos(sceneProgress * 45) * 0.6 + (Math.random() - 0.5) * 0.8) * 10 * intensityMult;
+        break;
     }
   }
 
@@ -214,6 +247,9 @@ export function drawSceneFrameOnCanvas(
     }
 
     ctx.translate(canvasWidth / 2 + offsetX, canvasHeight / 2 + offsetY);
+    if (rotationRad !== 0) {
+      ctx.rotate(rotationRad);
+    }
     ctx.scale(scale, scale);
     ctx.drawImage(mediaElement, -drawW / 2, -drawH / 2, drawW, drawH);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -225,6 +261,23 @@ export function drawSceneFrameOnCanvas(
     grad.addColorStop(1, '#3B0764');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+  }
+
+  // Smooth Transition Overlays (Fade to Black / Whip Pan)
+  if (scene.transition === 'fade_black') {
+    const fadeIn = Math.max(0, 1.0 - sceneProgress / 0.14);
+    const fadeOut = Math.max(0, (sceneProgress - 0.86) / 0.14);
+    const blackAlpha = Math.max(fadeIn, fadeOut);
+    if (blackAlpha > 0.01) {
+      ctx.fillStyle = `rgba(9, 10, 15, ${Math.min(1.0, blackAlpha)})`;
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    }
+  } else if (scene.transition === 'whip_pan') {
+    const whipExit = Math.max(0, (sceneProgress - 0.85) / 0.15);
+    if (whipExit > 0) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${whipExit * 0.35})`;
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    }
   }
 
   // Cinematic vignette & bottom gradient for subtitle legibility

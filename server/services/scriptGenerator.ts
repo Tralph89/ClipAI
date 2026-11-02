@@ -9,8 +9,13 @@ import { generateAIJson, generateAIText } from './aiProvider.ts';
 const CAMERA_MOTIONS: CameraMotionType[] = [
   'zoom_in',
   'pan_right',
+  'pan_up',
   'zoom_out',
+  'dolly_zoom',
   'pan_left',
+  'orbital_drift',
+  'pan_down',
+  'shake_horror',
   'pulse',
 ];
 

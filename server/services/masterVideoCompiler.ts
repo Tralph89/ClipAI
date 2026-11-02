@@ -240,20 +240,41 @@ async function renderSceneSegment(params: {
   if (imagePath && fs.existsSync(imagePath)) {
     // Scene with static image: Apply smooth Ken Burns zoompan motion
     const motion = scene.cameraMotion || 'zoom_in';
-    let zoomExpr = `min(zoom+0.0016,1.22)`;
+    const intensity = scene.motionIntensity || 'cinematic';
+    const speedMult =
+      intensity === 'subtle' ? 0.6 : intensity === 'dynamic' ? 1.5 : intensity === 'aggressive' ? 2.2 : 1.0;
+
+    let zoomExpr = `min(zoom+${(0.0016 * speedMult).toFixed(4)},1.25)`;
     let xExpr = `iw/2-(iw/zoom/2)`;
     let yExpr = `ih/2-(ih/zoom/2)`;
 
     if (motion === 'zoom_out') {
-      zoomExpr = `if(lte(zoom,1.0),1.22,max(1.001,zoom-0.0016))`;
+      zoomExpr = `if(lte(zoom,1.0),1.22,max(1.001,zoom-${(0.0016 * speedMult).toFixed(4)}))`;
     } else if (motion === 'pan_right') {
       zoomExpr = `1.15`;
-      xExpr = `if(lte(on,1),(iw-iw/zoom)/2,min(iw-iw/zoom,x+1.4))`;
+      xExpr = `if(lte(on,1),(iw-iw/zoom)/2,min(iw-iw/zoom,x+${(1.4 * speedMult).toFixed(2)}))`;
     } else if (motion === 'pan_left') {
       zoomExpr = `1.15`;
-      xExpr = `if(lte(on,1),(iw-iw/zoom)/2,max(0,x-1.4))`;
+      xExpr = `if(lte(on,1),(iw-iw/zoom)/2,max(0,x-${(1.4 * speedMult).toFixed(2)}))`;
+    } else if (motion === 'pan_up') {
+      zoomExpr = `1.15`;
+      yExpr = `if(lte(on,1),(ih-ih/zoom)/2,max(0,y-${(1.4 * speedMult).toFixed(2)}))`;
+    } else if (motion === 'pan_down') {
+      zoomExpr = `1.15`;
+      yExpr = `if(lte(on,1),(ih-ih/zoom)/2,min(ih-ih/zoom,y+${(1.4 * speedMult).toFixed(2)}))`;
+    } else if (motion === 'dolly_zoom') {
+      zoomExpr = `min(1.0+${(0.0028 * speedMult).toFixed(4)}*on,1.35)`;
+      yExpr = `ih/2-(ih/zoom/2)`;
+    } else if (motion === 'orbital_drift') {
+      zoomExpr = `1.12+${(0.0010 * speedMult).toFixed(4)}*on`;
+      xExpr = `iw/2-(iw/zoom/2)+sin(2*PI*on/${totalFrames})*${(18 * speedMult).toFixed(1)}`;
+      yExpr = `ih/2-(ih/zoom/2)+cos(2*PI*on/${totalFrames})*${(14 * speedMult).toFixed(1)}`;
     } else if (motion === 'pulse') {
-      zoomExpr = `1.08+0.05*sin(2*PI*on/${totalFrames})`;
+      zoomExpr = `1.08+${(0.06 * speedMult).toFixed(3)}*sin(2*PI*on/${totalFrames})`;
+    } else if (motion === 'shake_horror') {
+      zoomExpr = `1.12`;
+      xExpr = `iw/2-(iw/zoom/2)+sin(on*3.8)*${(9 * speedMult).toFixed(1)}`;
+      yExpr = `ih/2-(ih/zoom/2)+cos(on*4.6)*${(7 * speedMult).toFixed(1)}`;
     }
 
     const filter = `zoompan=z='${zoomExpr}':x='${xExpr}':y='${yExpr}':d=${totalFrames}:s=${targetWidth}x${targetHeight}:fps=30`;

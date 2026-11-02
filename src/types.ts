@@ -13,7 +13,21 @@ export type SocialPlatformId =
   | 'facebook_reels'
   | 'youtube_long';
 
-export type CameraMotionType = 'zoom_in' | 'zoom_out' | 'pan_right' | 'pan_left' | 'pulse';
+export type CameraMotionType =
+  | 'zoom_in'
+  | 'zoom_out'
+  | 'pan_right'
+  | 'pan_left'
+  | 'pan_up'
+  | 'pan_down'
+  | 'dolly_zoom'
+  | 'orbital_drift'
+  | 'pulse'
+  | 'shake_horror';
+
+export type MotionIntensityType = 'subtle' | 'cinematic' | 'dynamic' | 'aggressive';
+
+export type SceneTransitionType = 'cut' | 'fade_black' | 'crossfade' | 'whip_pan';
 
 export type SubtitleStyleType = 'hormozi' | 'neon' | 'minimal' | 'boxed';
 
@@ -71,6 +85,8 @@ export interface Scene {
   videoUrl?: string;
   animatedUrl?: string;
   cameraMotion?: CameraMotionType;
+  motionIntensity?: MotionIntensityType;
+  transition?: SceneTransitionType;
   durationSec?: number;
   startSec?: number;
   endSec?: number;

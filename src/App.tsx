@@ -82,6 +82,7 @@ import { CalendarHubView } from './components/CalendarHubView';
 import { VisualsStudioStep } from './components/VisualsStudioStep';
 import { VoiceStudioStep } from './components/VoiceStudioStep';
 import { MusicAndSfxStep } from './components/MusicAndSfxStep';
+import { AnimationStudioStep } from './components/AnimationStudioStep';
 import { renderMasterVideoOnServer } from './services/apiService';
 
 type WorkspaceTab = 'trends' | 'studio' | 'calendar' | 'channels';
@@ -1862,104 +1863,19 @@ GANCHO EXPLOSIVO (0-3s): "${trend.suggestedHook}"`;
               />
             )}
 
-            {/* STEP 5: ANIMACIÓN DE ESCENAS (HÍBRIDO KEN BURNS + VEO) */}
+            {/* STEP 5: ANIMACIÓN DE ESCENAS (ANIMATION STUDIO PRO) */}
             {state.step === 5 && (
-              <div className="space-y-6">
-                <div className="bg-[#11131C] border border-white/10 rounded-2xl p-6">
-                  <h2 className="text-lg font-bold text-white">
-                    Animación de Cámara y Generación de Clips IA (Veo / Omni Flash)
-                  </h2>
-                  <p className="text-xs text-zinc-400 mt-1">
-                    Configura el movimiento cinemático que el motor Canvas aplicará a cada escena o anima escenas individuales con IA generativa.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                  {scenes.map((scene, idx) => (
-                    <div
-                      key={idx}
-                      className="bg-[#11131C] border border-white/10 rounded-2xl p-4 space-y-4 flex flex-col justify-between"
-                    >
-                      <div className="space-y-3">
-                        <div className="aspect-video bg-[#090A0F] rounded-xl overflow-hidden relative border border-white/10">
-                          {scene.animatedUrl ? (
-                            <video
-                              src={scene.animatedUrl}
-                              controls
-                              loop
-                              muted
-                              className="w-full h-full object-cover"
-                            />
-                          ) : scene.imageUrl ? (
-                            <img
-                              src={scene.imageUrl}
-                              alt={scene.title}
-                              className="w-full h-full object-cover scale-105 transition-transform duration-1000"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-xs text-zinc-500">
-                              Sin imagen en Escena {idx + 1}
-                            </div>
-                          )}
-                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/75 text-[10px] font-mono text-white">
-                            Escena #{idx + 1}
-                          </span>
-                        </div>
-
-                        <div>
-                          <label className="text-[11px] font-mono uppercase text-zinc-400 block mb-1.5">
-                            Movimiento de Cámara en Render:
-                          </label>
-                          <select
-                            value={scene.cameraMotion || 'zoom_in'}
-                            onChange={(e) => {
-                              const motion = e.target.value as CameraMotionType;
-                              setScenes((prev) =>
-                                prev.map((s, i) =>
-                                  i === idx ? { ...s, cameraMotion: motion } : s
-                                )
-                              );
-                            }}
-                            className="w-full bg-[#090A0F] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                          >
-                            <option value="zoom_in">Zoom In Dramático (Ken Burns)</option>
-                            <option value="zoom_out">Zoom Out Revelador</option>
-                            <option value="pan_right">Paneo Cinematográfico Derecha</option>
-                            <option value="pan_left">Paneo Cinematográfico Izquierda</option>
-                            <option value="pulse">Pulso Dinámico de Retención</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => handleAnimateSceneAI(idx)}
-                        disabled={scene.isAnimating}
-                        className="w-full py-2.5 rounded-xl bg-violet-600/20 hover:bg-violet-600 border border-violet-500/40 text-violet-300 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
-                      >
-                        <Film className="w-3.5 h-3.5" />
-                        {scene.isAnimating
-                          ? 'Generando Clip Veo...'
-                          : 'Animar con Veo 3.1 / Omni Flash'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex justify-between">
-                  <button
-                    onClick={() => setState((prev) => ({ ...prev, step: 4 }))}
-                    className="px-4 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-semibold flex items-center gap-1 cursor-pointer"
-                  >
-                    <ChevronLeft className="w-4 h-4" /> Anterior
-                  </button>
-                  <button
-                    onClick={() => setState((prev) => ({ ...prev, step: 6 }))}
-                    className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold flex items-center gap-2 cursor-pointer"
-                  >
-                    Siguiente: Subtítulos <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+              <AnimationStudioStep
+                scenes={scenes}
+                aspectRatio={state.aspectRatio}
+                onUpdateScene={(idx, patch) =>
+                  setScenes((prev) =>
+                    prev.map((s, i) => (i === idx ? { ...s, ...patch } : s))
+                  )
+                }
+                onPrevStep={() => setState((prev) => ({ ...prev, step: 4 }))}
+                onNextStep={() => setState((prev) => ({ ...prev, step: 6 }))}
+              />
             )}
 
             {/* STEP 6: SUBTÍTULOS DINÁMICOS */}
