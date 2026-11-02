@@ -10,6 +10,7 @@ import {
   ScheduledPost,
   SocialChannel,
   TrendItem,
+  SavedTrendIdea,
 } from '../../src/types.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -30,6 +31,7 @@ export interface LocalDatabaseSchema {
   projects: Project[];
   scheduledPosts: ScheduledPost[];
   trends: TrendItem[];
+  savedTrends?: SavedTrendIdea[];
 }
 
 const INITIAL_TRENDS: TrendItem[] = [
@@ -121,6 +123,7 @@ function buildDefaultDb(): LocalDatabaseSchema {
     projects: [],
     scheduledPosts: [],
     trends: INITIAL_TRENDS,
+    savedTrends: [],
   };
 }
 
@@ -145,6 +148,7 @@ export function loadDb(): LocalDatabaseSchema {
       projects: Array.isArray(parsed.projects) ? parsed.projects : [],
       scheduledPosts: Array.isArray(parsed.scheduledPosts) ? parsed.scheduledPosts : [],
       trends: Array.isArray(parsed.trends) && parsed.trends.length > 0 ? parsed.trends : defaults.trends,
+      savedTrends: Array.isArray(parsed.savedTrends) ? parsed.savedTrends : [],
     };
     return cachedDb;
   } catch (err) {
@@ -329,3 +333,39 @@ export function countStoredMediaFiles(): number {
   return count;
 }
 
+
+
+export function getSavedTrends(channelId?: string): SavedTrendIdea[] {
+  const db = loadDb();
+  const list = db.savedTrends || [];
+  if (channelId) {
+    return list.filter((item) => !item.channelId || item.channelId === channelId);
+  }
+  return list;
+}
+
+export function saveTrendIdea(idea: SavedTrendIdea): SavedTrendIdea {
+  const db = loadDb();
+  const list = db.savedTrends || [];
+  const existingIdx = list.findIndex((t) => t.id === idea.id);
+  if (existingIdx >= 0) {
+    list[existingIdx] = { ...idea, savedAt: Date.now() };
+  } else {
+    list.unshift({ ...idea, savedAt: Date.now() });
+  }
+  db.savedTrends = list;
+  saveDb(db);
+  return idea;
+}
+
+export function deleteSavedTrend(id: string): boolean {
+  const db = loadDb();
+  const list = db.savedTrends || [];
+  const filtered = list.filter((t) => t.id !== id);
+  if (filtered.length !== list.length) {
+    db.savedTrends = filtered;
+    saveDb(db);
+    return true;
+  }
+  return false;
+}

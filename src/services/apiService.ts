@@ -195,6 +195,9 @@ export async function uploadBlobUrlToDisk(
 export async function searchLiveTrends(params: {
   query?: string;
   niche?: string;
+  channelName?: string;
+  channelNiche?: string;
+  channelTone?: string;
   region?: string;
   platforms?: SocialPlatformId[];
   mode?: 'niche' | 'breaking';
@@ -770,6 +773,58 @@ export async function transcribeVideoUrl(url: string): Promise<VideoTranscriptio
     throw new Error(data.error || 'No se pudo transcribir el video.');
   }
   return data;
+}
+
+export async function transcribeRawText(params: {
+  text: string;
+  customTitle?: string;
+  channelTone?: string;
+  channelNiche?: string;
+}): Promise<VideoTranscriptionData> {
+  const response = await fetch('/api/trends/transcribe-text', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'No se pudo estructurar el texto.');
+  }
+  return data;
+}
+
+export async function fetchSavedTrends(channelId?: string): Promise<SavedTrendIdea[]> {
+  const url = channelId ? `/api/trends/saved?channelId=${encodeURIComponent(channelId)}` : '/api/trends/saved';
+  const response = await fetch(url);
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'No se pudieron obtener las ideas guardadas.');
+  }
+  return data.saved || [];
+}
+
+export async function saveTrendIdeaApi(idea: SavedTrendIdea): Promise<SavedTrendIdea> {
+  const response = await fetch('/api/trends/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(idea),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'No se pudo guardar la idea.');
+  }
+  return data.saved;
+}
+
+export async function deleteSavedTrendApi(id: string): Promise<boolean> {
+  const response = await fetch(`/api/trends/saved/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'No se pudo eliminar la idea guardada.');
+  }
+  return data.success;
 }
 
 export async function fetchMusicLibrary(): Promise<MusicLibraryItem[]> {

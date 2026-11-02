@@ -558,3 +558,4 @@ export const MusicAndSfxStep: React.FC<MusicAndSfxStepProps> = ({
     </div>
   );
 };
+

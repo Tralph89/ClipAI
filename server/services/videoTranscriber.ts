@@ -275,3 +275,122 @@ Genera un análisis en formato JSON con esta estructura exacta:
     recommendedFormats,
   };
 }
+
+
+/**
+ * Rapidly extracts available subtitles (VTT/SRT) from a video using yt-dlp without downloading media.
+ */
+export async function extractQuickVideoSubtitles(url: string, timeoutMs: number = 12000): Promise<string> {
+  const ytdlpPath = resolveLocalToolPath('yt-dlp');
+  if (!ytdlpPath || !url.startsWith('http')) return '';
+
+  const tempId = `subs_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const tempDir = path.join(DATA_DIR, 'tmp', tempId);
+  fs.mkdirSync(tempDir, { recursive: true });
+
+  try {
+    const subOutTemplate = path.join(tempDir, 'sub.%(ext)s');
+    await execFileAsync(
+      ytdlpPath,
+      [
+        '--write-subs',
+        '--write-auto-subs',
+        '--sub-langs',
+        'es.*,es,es-419,es-ES,es-MX,en.*,en',
+        '--sub-format',
+        'vtt/srt',
+        '--skip-download',
+        '--no-warnings',
+        '-o',
+        subOutTemplate,
+        url,
+      ],
+      { timeout: timeoutMs }
+    );
+
+    const files = fs.readdirSync(tempDir);
+    const subFile = files.find((f) => f.endsWith('.vtt') || f.endsWith('.srt'));
+    if (subFile) {
+      const content = fs.readFileSync(path.join(tempDir, subFile), 'utf-8');
+      const cleaned = cleanSubtitleText(content);
+      return cleaned;
+    }
+    return '';
+  } catch {
+    return '';
+  } finally {
+    fs.rm(tempDir, { recursive: true, force: true }, () => {});
+  }
+}
+
+/**
+ * Structures and enriches raw pasted text, articles, or testimony for direct script generation.
+ */
+export async function structureRawTextForChannel(params: {
+  rawText: string;
+  customTitle?: string;
+  channelTone?: string;
+  channelNiche?: string;
+}): Promise<VideoTranscriptionResult> {
+  const rawText = params.rawText.trim();
+  if (rawText.length < 40) {
+    throw new Error('El texto proporcionado es demasiado corto para estructurar un caso o guion.');
+  }
+
+  const excerpt = rawText.slice(0, 5000);
+  const safeTitle = (params.customTitle || 'Título periodístico o de misterio').replace(/"/g, '');
+  const aiPrompt = `Analiza este texto / noticia / transcripción para un canal con enfoque "${params.channelNiche || 'General'}" y tono "${params.channelTone || 'Envolvente, claro y de alta retención'}":
+
+"""
+${excerpt}
+"""
+
+Extrae los datos clave y estructura un caso de alto impacto. Devuelve ÚNICAMENTE un JSON con:
+{
+  "title": "${safeTitle}",
+  "summary": "Resumen ejecutivo de 2 oraciones con el hecho central",
+  "suggestedHook": "Gancho verbal exacto de los primeros 3 segundos con el tono del canal",
+  "angle": "Ángulo editorial óptimo para el guion",
+  "mysteryElements": ["Dato clave 1", "Dato clave 2", "Dato clave 3"],
+  "recommendedFormats": ["9:16", "16:9"]
+}`;
+
+  let title = params.customTitle || 'Artículo / Texto Estructurado';
+  let summary = excerpt.slice(0, 160) + '...';
+  let suggestedHook = 'Lo que revela este documento cambiará por completo lo que creías saber...';
+  let angle = params.channelTone || 'Narración inmersiva y testimonial';
+  let mysteryElements = ['Hechos documentados', 'Evidencia testimonial', 'Giro final'];
+  let recommendedFormats: ('9:16' | '16:9')[] = ['9:16', '16:9'];
+
+  try {
+    const aiResult = await generateAIText({
+      prompt: aiPrompt,
+      systemInstruction: 'Eres un editor jefe de contenido de alto impacto. Devuelve únicamente JSON válido.',
+      jsonMode: true,
+      temperature: 0.6,
+    });
+    const parsed = extractJsonPayload<any>(aiResult.text, {});
+    if (parsed.title) title = parsed.title;
+    if (parsed.summary) summary = parsed.summary;
+    if (parsed.suggestedHook) suggestedHook = parsed.suggestedHook;
+    if (parsed.angle) angle = parsed.angle;
+    if (Array.isArray(parsed.mysteryElements)) mysteryElements = parsed.mysteryElements;
+    if (Array.isArray(parsed.recommendedFormats)) recommendedFormats = parsed.recommendedFormats;
+  } catch (err: any) {
+    console.warn('[videoTranscriber] Text structuring AI fallback:', err.message);
+  }
+
+  return {
+    url: 'internal://raw-text',
+    title,
+    uploader: 'Texto / Documento Importado',
+    durationSec: Math.max(45, Math.min(300, Math.round(rawText.split(/\s+/).length / 2.2))),
+    thumbnailUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80',
+    transcript: rawText,
+    summary,
+    suggestedHook,
+    angle,
+    mysteryElements,
+    recommendedFormats,
+  };
+}

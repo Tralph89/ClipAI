@@ -488,9 +488,24 @@ export default function App() {
         nextState.language,
         chosenRatio,
         activeChannel.tone,
-        trend.fullTranscript
-          ? `TRANSCRIPCIÓN COMPLETA DEL CASO / VIDEO DE REFERENCIA:\n"""\n${trend.fullTranscript.slice(0, 14000)}\n"""\n\nResumen del misterio: ${trend.summary}\nPuntos clave: ${trend.angle}\nGancho sugerido: ${trend.suggestedHook}`
-          : `${trend.whyTrending} (${trend.summary})`
+(() => {
+          const richMaterial = trend.fullTranscript || trend.detailedContent;
+          if (richMaterial) {
+            const evidenceBlock = Array.isArray(trend.evidencePoints) && trend.evidencePoints.length > 0
+              ? `\nEVIDENCIA Y DATOS COMPROBADOS:\n${trend.evidencePoints.map((p) => `- ${p}`).join('\n')}`
+              : '';
+            return `### MATERIAL DE INVESTIGACIÓN Y TRANSCRIPCIÓN REAL DEL CASO:
+"""
+${richMaterial.slice(0, 14000)}
+"""
+${evidenceBlock}
+
+RESUMEN CENTRAL: ${trend.summary}
+ÁNGULO NARRATIVO Y TONO: ${trend.angle || activeChannel.tone}
+GANCHO EXPLOSIVO (0-3s): "${trend.suggestedHook}"`;
+          }
+          return `${trend.whyTrending} (${trend.summary}). Enfoque: ${trend.angle || activeChannel.tone}. Hook: "${trend.suggestedHook}"`;
+        })()
       );
       const parsedScenes = parseScriptIntoScenes(
         generated,

@@ -21,6 +21,9 @@ import {
   DATA_DIR,
   MEDIA_DIR,
   MediaSubfolder,
+  getSavedTrends,
+  saveTrendIdea,
+  deleteSavedTrend,
   normalizeProjectMedia,
   saveBufferToMedia,
   saveDataUrlToMedia,
@@ -33,7 +36,7 @@ import {
   generateAIText,
 } from './server/services/aiProvider.ts';
 import { discoverMultiSourceTrends } from './server/services/trendCollector.ts';
-import { transcribeVideoUrl } from './server/services/videoTranscriber.ts';
+import { transcribeVideoUrl, structureRawTextForChannel } from './server/services/videoTranscriber.ts';
 import { generateStructuredViralScript } from './server/services/scriptGenerator.ts';
 import {
   buildSyncedSrtFromScenes,
@@ -283,12 +286,24 @@ ensureStorageDirectories();
   // 1. Live Multi-Source Free Trend Discovery ($0: Google Trends RSS + Google News RSS + YouTube yt-dlp + Reddit + Hacker News + Ollama)
   app.post('/api/trends/search', async (req, res) => {
     try {
-      const { query, niche, region = 'Global / Español', platforms = [], mode = 'niche' } = req.body;
+      const {
+        query,
+        niche,
+        channelName,
+        channelNiche,
+        channelTone,
+        region = 'Global / Español',
+        platforms = [],
+        mode = 'niche',
+      } = req.body;
       const db = loadDb();
 
       const result = await discoverMultiSourceTrends({
         query,
         niche,
+        channelName,
+        channelNiche,
+        channelTone,
         region,
         platforms,
         mode,
@@ -319,6 +334,59 @@ ensureStorageDirectories();
     } catch (error: any) {
       console.error('Error transcribing video URL:', error);
       res.status(500).json({ error: error.message || 'No se pudo transcribir el video.' });
+    }
+  });
+
+  // 1c. Structure Raw Text / Article directly
+  app.post('/api/trends/transcribe-text', async (req, res) => {
+    try {
+      const { text, customTitle, channelTone, channelNiche } = req.body || {};
+      if (!text || typeof text !== 'string') {
+        return res.status(400).json({ error: 'Ingresa un texto o documento válido.' });
+      }
+      const result = await structureRawTextForChannel({
+        rawText: text,
+        customTitle,
+        channelTone,
+        channelNiche,
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error structuring raw text:', error);
+      res.status(500).json({ error: error.message || 'Error al estructurar el texto.' });
+    }
+  });
+
+  // 1d. Saved Trend Ideas (Bank / Favorites)
+  app.get('/api/trends/saved', (req, res) => {
+    try {
+      const channelId = req.query.channelId as string | undefined;
+      const saved = getSavedTrends(channelId);
+      res.json({ saved });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Error al obtener ideas guardadas.' });
+    }
+  });
+
+  app.post('/api/trends/save', (req, res) => {
+    try {
+      const idea = req.body;
+      if (!idea || !idea.id || !idea.title) {
+        return res.status(400).json({ error: 'Datos de idea inválidos.' });
+      }
+      const saved = saveTrendIdea(idea);
+      res.json({ saved });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Error al guardar idea.' });
+    }
+  });
+
+  app.delete('/api/trends/saved/:id', (req, res) => {
+    try {
+      const ok = deleteSavedTrend(req.params.id);
+      res.json({ success: ok });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Error al eliminar idea guardada.' });
     }
   });
 

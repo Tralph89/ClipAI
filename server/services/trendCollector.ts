@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import { AspectRatioType, SocialPlatformId, TrendItem } from '../../src/types.ts';
 import { generateAIJson } from './aiProvider.ts';
 import { resolveLocalToolPath } from './systemTools.ts';
+import { extractQuickVideoSubtitles } from './videoTranscriber.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -76,11 +77,17 @@ function getRegionCodes(region: string): {
   if (region.includes('Estados Unidos')) {
     return { geos: ['US'], hl: 'en-US', gl: 'US', ceid: 'US:en' };
   }
-  if (region.includes('México')) {
+  if (region.includes('Argentina')) {
+    return { geos: ['AR'], hl: 'es-419', gl: 'AR', ceid: 'AR:es-419' };
+  }
+  if (region.includes('Colombia')) {
+    return { geos: ['CO'], hl: 'es-419', gl: 'CO', ceid: 'CO:es-419' };
+  }
+  if (region.includes('México') || region.includes('LATAM')) {
     return { geos: ['MX', 'CO'], hl: 'es-419', gl: 'MX', ceid: 'MX:es-419' };
   }
   // Global / Español default
-  return { geos: ['MX', 'ES'], hl: 'es-419', gl: 'MX', ceid: 'MX:es-419' };
+  return { geos: ['MX', 'ES', 'AR', 'CO'], hl: 'es-419', gl: 'MX', ceid: 'MX:es-419' };
 }
 
 // 1. Google Trends Daily Trending Searches RSS ($0, Real Traffic Metrics)
@@ -311,33 +318,47 @@ function deduplicateSignals(all: RawTrendSignal[]): RawTrendSignal[] {
 
 function buildFallbackTrendsFromSignals(
   signals: RawTrendSignal[],
-  niche: string
+  niche: string,
+  channelTone?: string
 ): TrendItem[] {
-  return signals.slice(0, 6).map((sig, idx) => ({
-    id: `trend-${Date.now()}-${idx}`,
-    title: sig.title,
-    summary: sig.snippet,
-    viralScore: Math.max(78, 95 - idx * 3),
-    category: niche || 'Tendencia en Vivo',
-    whyTrending: `${sig.sourceLabel} (${sig.trafficOrEngagement || 'En tendencia hoy'})`,
-    suggestedHook: `Mira lo que acaba de pasar con "${sig.title.slice(0, 55)}" y por qué todos están hablando de esto...`,
-    angle: 'Resumen ágil con contexto visual y conclusión directa en menos de 60 segundos.',
-    recommendedFormats: ['9:16', '16:9'],
-    recommendedPlatforms: ['youtube_shorts', 'tiktok', 'facebook_reels', 'youtube_long'],
-    keywords: sig.title
-      .split(/\s+/)
-      .filter((w) => w.length > 4)
-      .slice(0, 4),
-    sources: [{ title: sig.sourceLabel, uri: sig.url }],
-    trafficBadge: sig.trafficOrEngagement,
-    sourceTypes: [sig.sourceKind],
-    detectedAt: Date.now(),
-  }));
+  return signals.slice(0, 6).map((sig, idx) => {
+    const isVideo = sig.sourceKind === 'youtube';
+    const detailed = `${sig.title}. ${sig.snippet}. Datos verificados reportados por ${sig.sourceLabel}. Contexto clave para desarrollo de guión en formato ${sig.trafficOrEngagement || 'alta retención'}.`;
+    return {
+      id: `trend-${Date.now()}-${idx}`,
+      title: sig.title,
+      summary: sig.snippet,
+      detailedContent: detailed,
+      contentType: isVideo ? 'video_transcript' : 'news_dossier',
+      evidencePoints: [sig.sourceLabel, sig.trafficOrEngagement || 'Tendencia activa hoy', sig.title],
+      viralScore: Math.max(78, 95 - idx * 3),
+      category: niche || 'Tendencia en Vivo',
+      whyTrending: `${sig.sourceLabel} (${sig.trafficOrEngagement || 'En tendencia hoy'})`,
+      suggestedHook: channelTone?.includes('sombrío') || channelTone?.includes('misterio')
+        ? `Lo que acaba de confirmarse sobre "${sig.title.slice(0, 50)}" es mucho más perturbador de lo que dijeron...`
+        : `Detén el scroll porque lo que acaba de pasar con "${sig.title.slice(0, 50)}" lo cambia todo...`,
+      angle: channelTone || 'Resumen ágil con contexto visual y conclusión directa en menos de 60 segundos.',
+      recommendedFormats: ['9:16', '16:9'],
+      recommendedPlatforms: ['youtube_shorts', 'tiktok', 'facebook_reels', 'youtube_long'],
+      keywords: sig.title
+        .split(/\s+/)
+        .filter((w) => w.length > 4)
+        .slice(0, 4),
+      sources: [{ title: sig.sourceLabel, uri: sig.url }],
+      trafficBadge: sig.trafficOrEngagement,
+      sourceTypes: [sig.sourceKind],
+      detectedAt: Date.now(),
+      fullTranscript: detailed,
+    };
+  });
 }
 
 export async function discoverMultiSourceTrends(params: {
   query?: string;
   niche?: string;
+  channelName?: string;
+  channelNiche?: string;
+  channelTone?: string;
   region?: string;
   platforms?: SocialPlatformId[];
   mode?: 'niche' | 'breaking';
@@ -349,7 +370,19 @@ export async function discoverMultiSourceTrends(params: {
   const startTime = Date.now();
   const region = params.region || 'Global / Español';
   const regionCfg = getRegionCodes(region);
-  const searchTopic = params.query?.trim() || params.niche?.trim() || 'Inteligencia Artificial y Tecnología';
+
+  // Build targeted search topic matching the active channel's niche
+  let searchTopic = '';
+  if (params.query?.trim()) {
+    searchTopic = params.query.trim();
+  } else if (params.niche?.trim()) {
+    searchTopic = params.niche.trim();
+  } else if (params.channelNiche?.trim()) {
+    searchTopic = params.channelNiche.trim();
+  } else {
+    searchTopic = 'Tendencias y Noticias Virales';
+  }
+
   const isBreakingMode = params.mode === 'breaking' && !params.query?.trim();
 
   // Execute all 5 free collectors in parallel
@@ -402,30 +435,51 @@ export async function discoverMultiSourceTrends(params: {
     )
     .join('\n');
 
-  const aiPrompt = `Analiza estas ${signals.length} señales REALES recolectadas en tiempo real hoy (${region}) sobre "${
-    isBreakingMode ? 'Tendencias Generales de Última Hora' : searchTopic
-  }":
+  const channelContext = params.channelName
+    ? `CANAL ACTIVO: "${params.channelName}" | NICHO: "${params.channelNiche || searchTopic}" | TONO OBLIGATORIO: "${params.channelTone || 'Envolvente, de alta retención'}"`
+    : `NICHO ACTIVO: "${searchTopic}"`;
 
+  const aiPrompt = `Actúa como Director Creativo y Estratega de Contenido para el siguiente canal:
+${channelContext}
+
+Se han recolectado estas ${signals.length} señales REALES en vivo (${region}):
 ${compactDigest}
 
-Selecciona y sintetiza las 6 mejores oportunidades de videos virales para YouTube Shorts, TikTok, Facebook Reels y YouTube 16:9.
+Selecciona y sintetiza las 6 mejores oportunidades de video adaptadas 100% al nicho y al tono del canal.
 Traduce al español cualquier titular en inglés manteniendo fidelidad total a los hechos reales.
+
+Para cada oportunidad:
+1. "title": Título magnético adaptado al estilo del canal.
+2. "summary": Resumen informativo de 2 oraciones con el hecho central.
+3. "detailedContent": DOSSIER DETALLADO (3 a 5 párrafos ricos en hechos) con:
+   - Cronología de los hechos (fechas, horas, lugares exactos).
+   - Nombres de personas, organismos, testigos o fuentes oficiales.
+   - Datos numéricos, citas textuales y evidencia clave.
+   - La controversia, dilema o enigma central. Este texto se enviará directamente para redactar el guión final.
+4. "evidencePoints": Array con 3 a 5 datos clave comprobables.
+5. "suggestedHook": Gancho verbal de los primeros 3 segundos (0-3s) redactado exactamente con el tono del canal ("${params.channelTone || 'Inmersivo y de alta retención'}").
+6. "angle": Ángulo narrativo coherente con el tono del canal.
+7. "recommendedFormats": ["9:16", "16:9"]
+8. "recommendedPlatforms": ["youtube_shorts", "tiktok", "facebook_reels", "youtube_long"]
+9. "keywords": ["palabra1", "palabra2", "palabra3"]
 
 Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta:
 {
   "trends": [
     {
-      "sourceIds": ["S1", "S3"],
-      "title": "Título magnético y claro en español",
-      "summary": "Resumen veraz de 2 oraciones con el dato clave de la noticia/tendencia",
+      "sourceIds": ["S1"],
+      "title": "Título en español",
+      "summary": "Resumen de 2 oraciones",
+      "detailedContent": "Dossier profundo estructurado...",
+      "evidencePoints": ["Dato clave 1", "Dato clave 2", "Dato clave 3"],
       "viralScore": 95,
-      "category": "Categoría corta",
-      "whyTrending": "Por qué está generando búsquedas o debate hoy",
-      "suggestedHook": "Gancho hablado de los primeros 3 segundos (0-3s) de altísima retención",
-      "angle": "Ángulo práctico recomendado para el guion del video",
+      "category": "Categoría",
+      "whyTrending": "Por qué es tendencia hoy",
+      "suggestedHook": "Gancho verbal 0-3s",
+      "angle": "Ángulo narrativo adaptado al tono",
       "recommendedFormats": ["9:16", "16:9"],
       "recommendedPlatforms": ["youtube_shorts", "tiktok", "facebook_reels", "youtube_long"],
-      "keywords": ["keyword1", "keyword2", "keyword3"]
+      "keywords": ["kw1", "kw2"]
     }
   ]
 }`;
@@ -457,16 +511,39 @@ Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta:
       };
     }
 
-    const enriched: TrendItem[] = rawItems.slice(0, 6).map((item, idx) => {
-      const ids: string[] = Array.isArray(item.sourceIds) ? item.sourceIds : [];
-      const matchedSignals = ids
-        .map((id) => signalMap.get(String(id).replace(/[\[\]\s]/g, '')))
-        .filter((s): s is RawTrendSignal => Boolean(s));
+    const enriched: TrendItem[] = await Promise.all(
+      rawItems.slice(0, 6).map(async (item, idx) => {
+        const ids: string[] = Array.isArray(item.sourceIds) ? item.sourceIds : [];
+        const matchedSignals = ids
+          .map((id) => signalMap.get(String(id).replace(/[\[\]\s]/g, '')))
+          .filter((s): s is RawTrendSignal => Boolean(s));
 
-      // Guarantee every card has at least 1 real verified source from our scraped signals
-      if (matchedSignals.length === 0 && signals[idx]) {
-        matchedSignals.push(signals[idx]);
-      }
+        if (matchedSignals.length === 0 && signals[idx]) {
+          matchedSignals.push(signals[idx]);
+        }
+
+        const primarySignal = matchedSignals[0];
+        const isVideo = primarySignal?.sourceKind === 'youtube';
+
+        let videoTranscript = '';
+        if (isVideo && primarySignal?.url) {
+          try {
+            videoTranscript = await extractQuickVideoSubtitles(primarySignal.url, 8000);
+          } catch {
+            // ignore
+          }
+        }
+
+        let detailedContent = item.detailedContent || '';
+        if (!detailedContent || detailedContent.length < 80) {
+          detailedContent = `${item.title || ''}. ${item.summary || ''}. ` +
+            `Datos e investigación verificada a través de ${primarySignal?.sourceLabel || 'fuente en vivo'}. ` +
+            `Esta tendencia ha generado ${primarySignal?.trafficOrEngagement || 'alta atención'} en redes y medios.`;
+        }
+
+        if (videoTranscript && videoTranscript.length > 50) {
+          detailedContent += `\n\n### TRANSCRIPCIÓN REAL DEL VIDEO DE REFERENCIA:\n${videoTranscript.slice(0, 9000)}`;
+        }
 
       const verifiedSources = matchedSignals.map((s) => ({
         title: s.sourceLabel,
@@ -481,34 +558,41 @@ Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta:
         ? item.recommendedPlatforms
         : ['youtube_shorts', 'tiktok', 'facebook_reels', 'youtube_long'];
 
-      return {
-        id: `trend-${Date.now()}-${idx}`,
-        title: item.title || matchedSignals[0]?.title || `Tendencia #${idx + 1}`,
-        summary: item.summary || matchedSignals[0]?.snippet || '',
-        viralScore:
-          typeof item.viralScore === 'number'
-            ? Math.min(99, Math.max(70, Math.round(item.viralScore)))
-            : 92 - idx * 2,
-        category: item.category || params.niche || 'Tendencia en Vivo',
-        whyTrending:
-          item.whyTrending ||
-          matchedSignals[0]?.trafficOrEngagement ||
-          'Pico de búsquedas y conversación activa hoy.',
-        suggestedHook:
-          item.suggestedHook ||
-          'Detén el scroll 5 segundos porque lo que acaba de ocurrir cambia las reglas...',
-        angle: item.angle || 'Explicación directa con datos visuales y conclusión accionable.',
-        recommendedFormats: validFormats.length ? validFormats : ['9:16', '16:9'],
-        recommendedPlatforms: validPlatforms.length
-          ? validPlatforms
-          : ['youtube_shorts', 'tiktok', 'facebook_reels'],
-        keywords: Array.isArray(item.keywords) ? item.keywords : [],
-        sources: verifiedSources,
-        trafficBadge: matchedSignals[0]?.trafficOrEngagement,
-        sourceTypes: Array.from(new Set(matchedSignals.map((s) => s.sourceKind))),
-        detectedAt: Date.now(),
-      };
-    });
+        return {
+          id: `trend-${Date.now()}-${idx}`,
+          title: item.title || matchedSignals[0]?.title || `Tendencia #${idx + 1}`,
+          summary: item.summary || matchedSignals[0]?.snippet || '',
+          detailedContent,
+          contentType: isVideo ? 'video_transcript' : 'news_dossier',
+          evidencePoints: Array.isArray(item.evidencePoints) && item.evidencePoints.length > 0
+            ? item.evidencePoints
+            : [matchedSignals[0]?.sourceLabel || 'Fuente Verificada', matchedSignals[0]?.trafficOrEngagement || 'Tendencia en Vivo'],
+          viralScore:
+            typeof item.viralScore === 'number'
+              ? Math.min(99, Math.max(70, Math.round(item.viralScore)))
+              : 92 - idx * 2,
+          category: item.category || params.niche || 'Tendencia en Vivo',
+          whyTrending:
+            item.whyTrending ||
+            matchedSignals[0]?.trafficOrEngagement ||
+            'Pico de búsquedas y conversación activa hoy.',
+          suggestedHook:
+            item.suggestedHook ||
+            'Detén el scroll 5 segundos porque lo que acaba de ocurrir cambia las reglas...',
+          angle: item.angle || params.channelTone || 'Explicación directa con datos visuales y conclusión accionable.',
+          recommendedFormats: validFormats.length ? validFormats : ['9:16', '16:9'],
+          recommendedPlatforms: validPlatforms.length
+            ? validPlatforms
+            : ['youtube_shorts', 'tiktok', 'facebook_reels'],
+          keywords: Array.isArray(item.keywords) ? item.keywords : [],
+          sources: verifiedSources,
+          trafficBadge: matchedSignals[0]?.trafficOrEngagement,
+          sourceTypes: Array.from(new Set(matchedSignals.map((s) => s.sourceKind))),
+          detectedAt: Date.now(),
+          fullTranscript: videoTranscript || detailedContent,
+        };
+      })
+    );
 
     return {
       trends: enriched,

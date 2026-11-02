@@ -196,6 +196,9 @@ export interface TrendItem {
   id: string;
   title: string;
   summary: string;
+  detailedContent?: string;
+  contentType?: 'video_transcript' | 'news_dossier' | 'community_debate';
+  evidencePoints?: string[];
   viralScore: number;
   category: string;
   whyTrending: string;
@@ -205,8 +208,16 @@ export interface TrendItem {
   recommendedPlatforms: SocialPlatformId[];
   keywords: string[];
   sources: Array<{ title: string; uri: string }>;
+  trafficBadge?: string;
+  sourceTypes?: string[];
   detectedAt: number;
   fullTranscript?: string;
+  isSaved?: boolean;
+}
+
+export interface SavedTrendIdea extends TrendItem {
+  channelId: string;
+  savedAt: number;
 }
 
 export interface ScheduledPost {
