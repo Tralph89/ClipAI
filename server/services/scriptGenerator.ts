@@ -255,6 +255,13 @@ export async function generateStructuredViralScript(params: {
     )
     .join('\n');
 
+  const isRelatos =
+    Boolean(
+      (params.subgenre && params.subgenre.toLowerCase().includes('relatos')) ||
+      (params.channelTone && params.channelTone.toLowerCase().includes('relatos')) ||
+      (params.prompt && params.prompt.toLowerCase().includes('relatos de la noche'))
+    );
+
   const structuredPrompt = `Actúa como director creativo y showrunner galardonado de videos virales de alta retención para YouTube Shorts, TikTok y Facebook Reels.
 Diseña un guion cinematográfico estructurado en la "Fórmula de 5 Actos Virales" para un video en formato ${aspectRatio} de duración objetivo ${params.duration || '60s'} (${targets.targetWords}).
 
@@ -268,6 +275,16 @@ ${
     ? `\n### MATERIAL DE REFERENCIA / TRANSCRIPCIÓN COMPLETA DEL CASO:\n${params.trendContext}\n\nDIRECTIVAS DE ADAPTACIÓN:
 - Adapta esta historia preservando los detalles más aterradores, nombres reales, horas exactas (ej. 'las 9:15 PM'), detalles cotidianos y coartadas del testimonio original.
 - Distribuye la narrativa a lo largo de los 5 Actos Virales de forma progresiva (Gancho inicial -> Contexto e Ilusión -> La Fisura en la Coartada -> El Quiebre -> Cierre y Remate).`
+    : ''
+}
+${
+  isRelatos
+    ? `\n### DIRECTIVA ESPECIAL: ESTILO "RELATOS DE LA NOCHE" (URIEL REYES):
+- Cadencia de narración: Pausada, sobria, reflexiva y madura. Tono de radio nocturna íntima de terror testimonial.
+- Estructura del relato: Basado en testimonios humanos verosímiles (guardias nocturnas, carreteras desoladas, casas silenciosas, turnos de hospital, sucesos cotidianos perturbados por algo inexplicable).
+- Gancho (Acto 1): Frase inicial reflexiva que invite a escuchar en soledad (ej. "Hay experiencias que sólo se entienden cuando cae la medianoche...", "Quien nos comparte este testimonio nos pidió mantener su nombre en el anonimato...").
+- Tensión psicológica: Prohibido usar clichés exagerados o sustos infantiles. El miedo nace de la lentitud, de la soledad, de una sombra donde no debería haber nada y de la atmósfera nocturna.
+- Cierre (Acto 5): Remate escalofriante y reflexivo: "Si esta noche sientes que alguien te observa desde la esquina de la habitación... procura no abrir los ojos. Buenas noches."`
     : ''
 }
 

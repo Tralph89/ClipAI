@@ -57,6 +57,8 @@ const STYLE_DESCRIPTIONS: Record<string, string> = {
     'epic dark fantasy digital masterpiece, Frank Frazetta and Greg Rutkowski aesthetic, glowing magical particles, ancient ruins, intricate ornate details, Unreal Engine 5 render',
   horror:
     'atmospheric gothic horror cinema, Guillermo del Toro aesthetic, eerie creeping fog, high contrast dark shadows, cold muted color palette, suspenseful framing',
+  relatos_noche:
+    'Relatos de la Noche aesthetic, dark atmospheric Mexican urban and folklore horror, late night eerie solitude, lonely street with sodium lamps in thick mist, shot on ARRI Alexa Mini LF, 35mm anamorphic lens, deep chiaroscuro shadows, muted desaturated cold tones, unsettling realism, cinematic 8k film still, masterpiece',
   photorealistic:
     'award-winning National Geographic documentary 8k photography, Sony A7R V, 85mm f/1.4 lens, razor sharp focus, natural skin pores and surface textures, photorealistic raytracing',
   scifi:
@@ -317,6 +319,7 @@ async function tryComfyUiImageGen(
       'cinematic',
       'photorealistic',
       'horror',
+      'relatos_noche',
       'biblia',
       'scifi',
       'lego',
@@ -916,7 +919,7 @@ export async function generateAndCacheSceneImage(params: {
         }
 
         const msg = lastGeminiErr.message || '';
-        if (lastGeminiErr.status === 429 || msg.includes('429') || msg.includes('quota') || msg.includes('limit: 0')) {
+        if ((lastGeminiErr as any).status === 429 || msg.includes('429') || msg.includes('quota') || msg.includes('limit: 0')) {
           throw new Error(
             'Google AI Studio Free Tier tiene límite 0 para generación de imágenes (Error 429: Quota Exceeded). Para usar Gemini Image debes habilitar facturación en tu proyecto de Google Cloud, o usar "GPU Local" / "Pixabay HD" ($0).'
           );
@@ -1942,7 +1945,7 @@ export async function generateSceneWithWanComfyUI(params: {
   return {
     videoClipUrl: `/media/videos/${outMp4Name}`,
     posterImageUrl: `/media/images/${posterName}`,
-    durationSec: measuredDur || targetDur || 3,
+    durationSec: measuredDur || params.targetDurationSec || 3,
     provider: 'wan-2.1-comfyui',
   };
 }

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import fs from 'fs';
 import express from 'express';
 import path from 'path';
 import crypto from 'crypto';
@@ -10,6 +11,7 @@ import {
   AIProviderId,
   AppSettings,
   Project,
+  Scene,
   ScheduledPost,
   SocialChannel,
   TrendItem,
@@ -41,6 +43,7 @@ import { generateStructuredViralScript } from './server/services/scriptGenerator
 import {
   buildSyncedSrtFromScenes,
   getOrCreateVoiceSample,
+  probeAudioDurationSec,
   rebuildMasterFromSceneAudios,
   synthesizeScenesVoiceover,
   synthesizeSingleVoiceClip,
@@ -1113,7 +1116,7 @@ Devuelve un JSON con esta estructura exacta:
           const cluster = await getLocalVideoClusterStatus();
           const enginesList = Object.values(cluster.engines);
           const onlineEngine = enginesList.find(
-            (e) => e.status === 'online' || e.status === 'ready' || e.status === 'busy'
+            (e) => (e.status as string) === 'online' || (e.status as string) === 'ready' || (e.status as string) === 'busy'
           );
           if (onlineEngine) {
             const localVid = await generateSceneLocalVideo({

@@ -169,7 +169,7 @@ export const StudioWizardView: React.FC<StudioWizardViewProps> = ({
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Voice Preview Sample Playback State (Step 2)
-  const [voiceEngineFilter, setVoiceEngineFilter] = useState<'all' | 'edge' | 'piper'>('all');
+  const [voiceEngineFilter, setVoiceEngineFilter] = useState<'all' | 'xtts' | 'edge' | 'piper'>('all');
   const [loadingSampleVoiceId, setLoadingSampleVoiceId] = useState<string | null>(null);
   const [playingSampleVoiceId, setPlayingSampleVoiceId] = useState<string | null>(null);
   const sampleAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -821,6 +821,10 @@ export const StudioWizardView: React.FC<StudioWizardViewProps> = ({
                   {
                     id: 'all' as const,
                     label: `Todas (${VOICES.length})`,
+                  },
+                  {
+                    id: 'xtts' as const,
+                    label: `XTTS Clones / Relatos (${VOICES.filter((v) => v.engine === 'xtts').length})`,
                   },
                   {
                     id: 'edge' as const,
@@ -2232,7 +2236,7 @@ export const StudioWizardView: React.FC<StudioWizardViewProps> = ({
                   }`}
                 >
                   <span>{plat.shortName}</span>
-                  {plat.v1Priority && (
+                  {(plat as any).v1Priority && (
                     <span className="text-[9px] font-mono px-1 rounded bg-emerald-500/25 text-emerald-300">
                       V1
                     </span>

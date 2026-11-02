@@ -5,7 +5,9 @@
 
 import {
   AspectRatioType,
+  CameraMotionType,
   ComfyArchitectureType,
+  MotionIntensityType,
   Scene,
   SocialPlatformId,
   StyleTechnicalProfile,

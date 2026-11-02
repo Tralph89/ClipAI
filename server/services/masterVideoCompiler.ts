@@ -489,8 +489,11 @@ export async function compileMasterVideo(params: {
     if (params.channelWatermark) {
       const safeWatermark = params.channelWatermark.replace(/[:\\']/g, '');
       const wmFontSize = Math.round(targetWidth * 0.028);
+      const fontFileArg = fs.existsSync('C:/Windows/Fonts/arial.ttf')
+        ? ":fontfile='C\\:/Windows/Fonts/arial.ttf'"
+        : '';
       filterParts.push(
-        `drawtext=text='${safeWatermark}':x=${Math.round(targetWidth * 0.05)}:y=${Math.round(
+        `drawtext=text='${safeWatermark}'${fontFileArg}:x=${Math.round(targetWidth * 0.05)}:y=${Math.round(
           targetHeight * 0.055
         )}:fontsize=${wmFontSize}:fontcolor=white@0.85:shadowcolor=black@0.6:shadowx=2:shadowy=2`
       );
@@ -539,18 +542,15 @@ export async function compileMasterVideo(params: {
     } catch (nvencErr) {
       // Graceful fallback to CPU libx264
       console.warn('NVENC failed, falling back to libx264:', (nvencErr as Error).message);
-      const nvencIdx = finalArgs.indexOf('h264_nvenc');
-      if (nvencIdx >= 0) {
-        finalArgs[nvencIdx] = 'libx264';
-        const presetIdx = finalArgs.indexOf('-preset');
-        if (presetIdx >= 0) {
-          finalArgs[presetIdx + 1] = 'fast';
-        }
-        finalArgs.push('-crf', '20');
-        await execFileAsync(ffmpegPath, finalArgs, { timeout: 180_000 });
-      } else {
-        throw nvencErr;
-      }
+      const fallbackArgs = finalArgs.map((arg, idx) => {
+        if (arg === 'h264_nvenc') return 'libx264';
+        if (finalArgs[idx - 1] === '-preset' && arg === 'p4') return 'fast';
+        return arg;
+      });
+      // Insert CRF before the final output path
+      const outIdx = fallbackArgs.length - 1;
+      fallbackArgs.splice(outIdx, 0, '-crf', '20');
+      await execFileAsync(ffmpegPath, fallbackArgs, { timeout: 180_000 });
     }
 
     // Measure final video properties

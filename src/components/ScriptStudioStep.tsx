@@ -17,6 +17,7 @@ import {
   UserCheck,
   Compass,
   Zap,
+  Moon,
 } from 'lucide-react';
 import {
   AspectRatioType,
@@ -401,6 +402,23 @@ export const ScriptStudioStep: React.FC<ScriptStudioStepProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectGenre('horror', 'Relatos de la Noche & Testimonios');
+                  if (!prompt || prompt.trim().length === 0) {
+                    onChangePrompt(
+                      'Turno nocturno: Una guardia solitaria en una clínica a las 3:15 AM cuando tocan la puerta cerrada...'
+                    );
+                  }
+                  handleApplyFiveActTemplate();
+                }}
+                className="px-3 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/40 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                title="Configura automáticamente la estructura y tono oficial de Relatos de la Noche"
+              >
+                <Moon className="w-3.5 h-3.5 text-indigo-400" /> Modo Relatos de la Noche
+              </button>
+
               <button
                 type="button"
                 onClick={handleApplyFiveActTemplate}

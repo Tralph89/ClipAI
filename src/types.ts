@@ -89,6 +89,7 @@ export interface Scene {
   sourceType?: 'local_ai' | 'cloud_ai' | 'stock' | 'user_upload';
   imageUrl?: string;
   videoUrl?: string;
+  videoClipUrl?: string;
   animatedUrl?: string;
   cameraMotion?: CameraMotionType;
   motionIntensity?: MotionIntensityType;
@@ -106,6 +107,8 @@ export interface Scene {
   isGeneratingVoice?: boolean;
   sfxPresetId?: string;
   visualSeed?: number;
+  visualSource?: string;
+  visualProvider?: string;
   renderedWithEngine?: string;
   // ComfyUI & Visual Coherence metadata
   comfyPositivePrompt?: string;
@@ -648,6 +651,18 @@ export const VIDEO_STYLES: StyleTechnicalProfile[] = [
     cameraAndLighting: 'low-key suspense lighting, claustrophobic framing, 35mm grainy night stock',
     negativePrompt: 'bright sunny, cheerful, vibrant rainbow, cute cartoon, smiling comedy, saturated pink, watermark',
     recommendedLoraHint: 'Gothic_Horror_Atmosphere_XL.safetensors',
+  },
+  {
+    id: 'relatos_noche',
+    name: 'Relatos de la Noche',
+    description: 'Claroscuro tenebrista, farolas de sodio, 35mm y realismo nocturno inquietante',
+    image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&h=300&q=80',
+    badge: 'ESTILO RELATOS',
+    fluxPrefix: 'Cinematic night horror photography in the official style of Relatos de la Noche, dark lonely Mexican street or dimly lit house interior at midnight, high contrast chiaroscuro, shot on ARRI Alexa Mini LF 35mm anamorphic lens,',
+    sdxlTags: '(Relatos de la Noche aesthetic, dark atmospheric urban horror, David Fincher chiaroscuro:1.4), eerie sodium vapor streetlamp, rain-slicked asphalt, deep cold shadows, muted desaturated tones, 35mm film grain,',
+    cameraAndLighting: 'low-key practical night lighting, volumetric fog, deep vignette, subtle rim lighting, hyperrealistic unsettling atmosphere, 8k',
+    negativePrompt: 'bright sunshine, daytime, colorful, joyful, cartoon, 3d render, anime, cute, smiling, saturated colors, flat lighting, text, watermark',
+    recommendedLoraHint: 'Relatos_De_La_Noche_Dark_XL.safetensors',
   },
   {
     id: 'pixelart',
