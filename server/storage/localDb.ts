@@ -127,15 +127,19 @@ function buildDefaultDb(): LocalDatabaseSchema {
   };
 }
 
+let cachedDbMtime: number = 0;
+
 export function loadDb(): LocalDatabaseSchema {
   ensureStorageDirectories();
-  if (cachedDb) return cachedDb;
 
   if (!fs.existsSync(DB_FILE)) {
     cachedDb = buildDefaultDb();
     saveDb(cachedDb);
     return cachedDb;
   }
+
+  const currentMtime = fs.statSync(DB_FILE).mtimeMs;
+  if (cachedDb && cachedDbMtime === currentMtime) return cachedDb;
 
   try {
     const raw = fs.readFileSync(DB_FILE, 'utf-8');
@@ -150,6 +154,7 @@ export function loadDb(): LocalDatabaseSchema {
       trends: Array.isArray(parsed.trends) && parsed.trends.length > 0 ? parsed.trends : defaults.trends,
       savedTrends: Array.isArray(parsed.savedTrends) ? parsed.savedTrends : [],
     };
+    cachedDbMtime = currentMtime;
     return cachedDb;
   } catch (err) {
     console.error('[localDb] Error reading db.json, initializing fresh copy:', err);
@@ -165,6 +170,9 @@ export function saveDb(nextDb: LocalDatabaseSchema): void {
   const tmpFile = `${DB_FILE}.tmp`;
   fs.writeFileSync(tmpFile, JSON.stringify(nextDb, null, 2), 'utf-8');
   fs.renameSync(tmpFile, DB_FILE);
+  try {
+    cachedDbMtime = fs.statSync(DB_FILE).mtimeMs;
+  } catch {}
 }
 
 function extensionFromMime(mime: string): string {

@@ -84,7 +84,12 @@ import { VoiceStudioStep } from './components/VoiceStudioStep';
 import { MusicAndSfxStep } from './components/MusicAndSfxStep';
 import { AnimationStudioStep } from './components/AnimationStudioStep';
 import { ScriptStudioStep } from './components/ScriptStudioStep';
-import { renderMasterVideoOnServer } from './services/apiService';
+import {
+  deleteProjectFromDisk,
+  fetchBootstrap,
+  renderMasterVideoOnServer,
+  saveProjectToDisk,
+} from './services/apiService';
 
 type WorkspaceTab = 'trends' | 'studio' | 'calendar' | 'channels';
 
@@ -288,6 +293,39 @@ export default function App() {
     } catch {}
   }, [comfyConfig]);
 
+  // Synchronize on startup with server disk database (/api/bootstrap)
+  useEffect(() => {
+    fetchBootstrap()
+      .then((data) => {
+        if (data.projects && data.projects.length > 0) {
+          setProjects(data.projects);
+          try {
+            localStorage.setItem('clipai_projects_v2', JSON.stringify(data.projects));
+          } catch {}
+
+          // Automatically load the newest project into the Studio
+          const newest = data.projects[0];
+          if (newest && newest.state && newest.scenes && newest.scenes.length > 0) {
+            setCurrentProjectId(newest.id);
+            if (newest.prompt) setPrompt(newest.prompt);
+            setState(newest.state);
+            setScenes(newest.scenes);
+            if (newest.sourceTrendTitle) setSourceTrendTitle(newest.sourceTrendTitle);
+            if (newest.state.comfyConfig) setComfyConfig(newest.state.comfyConfig);
+          }
+        }
+        if (data.channels && data.channels.length > 0) {
+          setChannels(data.channels);
+        }
+        if (data.scheduledPosts) {
+          setScheduledPosts(data.scheduledPosts);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not bootstrap from server, using local storage cache:', err);
+      });
+  }, []);
+
   // Active Studio State
   const [prompt, setPrompt] = useState<string>(
     'El perturbador caso de la cabaña abandonada en el bosque negro y las cintas que la policía ocultó'
@@ -391,6 +429,10 @@ export default function App() {
       }
       return [projectObj, ...prev];
     });
+
+    saveProjectToDisk(projectObj).catch((e) =>
+      console.warn('Could not persist project to disk:', e)
+    );
     return id;
   };
 
@@ -1420,9 +1462,10 @@ GANCHO EXPLOSIVO (0-3s): "${trend.suggestedHook}"`;
                       </p>
                     </button>
                     <button
-                      onClick={() =>
-                        setProjects((prev) => prev.filter((item) => item.id !== proj.id))
-                      }
+                      onClick={() => {
+                        setProjects((prev) => prev.filter((item) => item.id !== proj.id));
+                        deleteProjectFromDisk(proj.id).catch((e) => console.warn(e));
+                      }}
                       className="p-1.5 text-zinc-500 hover:text-red-400 cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
