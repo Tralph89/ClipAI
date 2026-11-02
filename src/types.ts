@@ -54,6 +54,7 @@ export interface ComfyUIConfig {
 
 export interface VisualBible {
   characterAnchor: string;
+  antagonistAnchor?: string;
   environmentAnchor: string;
   colorPalette: string;
   lightingDirective: string;
@@ -76,6 +77,11 @@ export interface StyleTechnicalProfile {
 export interface Scene {
   title: string;
   dialogue: string;
+  timeRange?: string;
+  actRole?: string;
+  visualDescription?: string;
+  onScreenText?: string;
+  soundEffect?: string;
   hookText?: string;
   imagePrompt?: string;
   stockKeywords?: string[];
@@ -406,12 +412,141 @@ export const SUBGENRES: Record<string, string[]> = {
 };
 
 export const DURATIONS = [
+  { id: '30s', name: '30s — Short Viral Rápido (9:16)', type: 'short' },
   { id: '60s', name: '60s — Short / TikTok / Reel (9:16)', type: 'short' },
   { id: '90s', name: '90s — Short Extendido (9:16)', type: 'short' },
   { id: '3m', name: '3 Minutos — Documental YouTube (16:9)', type: 'long' },
   { id: '5m', name: '5 Minutos — Expediente Largo (16:9)', type: 'long' },
   { id: '8m', name: '8 Minutos — Historia Completa (16:9)', type: 'long' },
 ];
+
+export interface FiveActTemplate {
+  actRole: string;
+  timeRange: string;
+  pacingNote: string;
+  defaultMotion: CameraMotionType;
+  defaultIntensity: MotionIntensityType;
+}
+
+export function getFiveActStructure(duration: string): FiveActTemplate[] {
+  switch (duration) {
+    case '30s':
+      return [
+        {
+          actRole: 'EL GANCHO',
+          timeRange: '[0:00 - 0:04]',
+          pacingNote: 'Inversión de premisa, detiene el scroll de inmediato, dilema perturbador.',
+          defaultMotion: 'dolly_zoom',
+          defaultIntensity: 'dynamic',
+        },
+        {
+          actRole: 'EL CONTEXTO Y LA ILUSIÓN',
+          timeRange: '[0:05 - 0:11]',
+          pacingNote: 'Falsa calma cotidiana, detalle temporal y suceso catalizador inesperado.',
+          defaultMotion: 'zoom_in',
+          defaultIntensity: 'cinematic',
+        },
+        {
+          actRole: 'LA FISURA EN LA COARTADA',
+          timeRange: '[0:12 - 0:19]',
+          pacingNote: 'Anomalía psicológica, sobre-especificidad perturbadora, manipulación.',
+          defaultMotion: 'pan_right',
+          defaultIntensity: 'dynamic',
+        },
+        {
+          actRole: 'EL QUIEBRE',
+          timeRange: '[0:20 - 0:26]',
+          pacingNote: 'Epifanía visual silenciosa, desmantelamiento de la mentira y maniobra evasiva.',
+          defaultMotion: 'shake_horror',
+          defaultIntensity: 'dynamic',
+        },
+        {
+          actRole: 'CIERRE / REMATE',
+          timeRange: '[0:27 - 0:30]',
+          pacingNote: 'Conclusión escalofriante, lección psicológica memorable y llamado sutil.',
+          defaultMotion: 'zoom_out',
+          defaultIntensity: 'subtle',
+        },
+      ];
+    case '90s':
+      return [
+        {
+          actRole: 'EL GANCHO',
+          timeRange: '[0:00 - 0:05]',
+          pacingNote: 'Subversión de premisa, detiene el scroll en 5 segundos con tensión inmediata.',
+          defaultMotion: 'dolly_zoom',
+          defaultIntensity: 'dynamic',
+        },
+        {
+          actRole: 'EL CONTEXTO Y LA ILUSIÓN',
+          timeRange: '[0:06 - 0:25]',
+          pacingNote: 'Rutina cotidiana, detalle de hora/lugar, toques en la puerta y coartada urgente del desconocido.',
+          defaultMotion: 'zoom_in',
+          defaultIntensity: 'cinematic',
+        },
+        {
+          actRole: 'LA FISURA EN LA COARTADA',
+          timeRange: '[0:26 - 0:55]',
+          pacingNote: 'El desconocido da datos demasiado íntimos y exactos, contradicción inquietante.',
+          defaultMotion: 'orbital_drift',
+          defaultIntensity: 'dynamic',
+        },
+        {
+          actRole: 'EL QUIEBRE',
+          timeRange: '[0:56 - 1:18]',
+          pacingNote: 'Revelación visual silenciosa, la acera vacía, llamada sin hablar, el sujeto se retira con calma.',
+          defaultMotion: 'shake_horror',
+          defaultIntensity: 'dynamic',
+        },
+        {
+          actRole: 'CIERRE / REMATE',
+          timeRange: '[1:19 - 1:30]',
+          pacingNote: 'Lección psicológica escalofriante: la preparación del intruso, cierre contundente.',
+          defaultMotion: 'zoom_out',
+          defaultIntensity: 'subtle',
+        },
+      ];
+    case '60s':
+    default:
+      return [
+        {
+          actRole: 'EL GANCHO',
+          timeRange: '[0:00 - 0:04]',
+          pacingNote: 'Inversión de premisa en 4 segundos, detiene el scroll, dilema perturbador.',
+          defaultMotion: 'dolly_zoom',
+          defaultIntensity: 'dynamic',
+        },
+        {
+          actRole: 'EL CONTEXTO Y LA ILUSIÓN',
+          timeRange: '[0:05 - 0:18]',
+          pacingNote: 'Detalle temporal y espacial (hora, rutina), tres golpes secos y medidos en la puerta, coartada urgente del desconocido.',
+          defaultMotion: 'zoom_in',
+          defaultIntensity: 'cinematic',
+        },
+        {
+          actRole: 'LA FISURA EN LA COARTADA',
+          timeRange: '[0:19 - 0:38]',
+          pacingNote: 'El desconocido da datos demasiado exactos (nombres reales, detalles familiares), urgencia calculada para apagar el juicio lógico.',
+          defaultMotion: 'pan_right',
+          defaultIntensity: 'dynamic',
+        },
+        {
+          actRole: 'EL QUIEBRE',
+          timeRange: '[0:39 - 0:52]',
+          pacingNote: 'Detalle visual clave: se detiene antes de girar el cerrojo, nota que la acera está vacía, llamada a emergencias, el sujeto camina hacia la oscuridad con calma.',
+          defaultMotion: 'shake_horror',
+          defaultIntensity: 'dynamic',
+        },
+        {
+          actRole: 'CIERRE / REMATE',
+          timeRange: '[0:53 - 1:00]',
+          pacingNote: 'Lección psicológica escalofriante: "La información es el arma...", remate contundente y memorable.',
+          defaultMotion: 'zoom_out',
+          defaultIntensity: 'subtle',
+        },
+      ];
+  }
+}
 
 export const VIDEO_STYLES: StyleTechnicalProfile[] = [
   {

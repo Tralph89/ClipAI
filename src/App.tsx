@@ -83,6 +83,7 @@ import { VisualsStudioStep } from './components/VisualsStudioStep';
 import { VoiceStudioStep } from './components/VoiceStudioStep';
 import { MusicAndSfxStep } from './components/MusicAndSfxStep';
 import { AnimationStudioStep } from './components/AnimationStudioStep';
+import { ScriptStudioStep } from './components/ScriptStudioStep';
 import { renderMasterVideoOnServer } from './services/apiService';
 
 type WorkspaceTab = 'trends' | 'studio' | 'calendar' | 'channels';
@@ -1537,277 +1538,38 @@ GANCHO EXPLOSIVO (0-3s): "${trend.suggestedHook}"`;
 
             {/* STEP 1: GUION VIRAL & FORMATO */}
             {state.step === 1 && (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-5 bg-[#11131C] border border-white/10 rounded-2xl p-6 space-y-5">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-violet-400" /> Configuración del Video
-                    </h2>
-                    <span className="text-xs font-mono text-zinc-400">
-                      Canal: {activeChannel.name}
-                    </span>
-                  </div>
-
-                  {sourceTrendTitle && (
-                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 text-xs text-emerald-300">
-                      <span className="font-mono uppercase text-[10px] block text-emerald-400 font-bold">
-                        Tendencia Vinculada:
-                      </span>
-                      {sourceTrendTitle}
-                    </div>
-                  )}
-
-                  {/* Aspect Ratio Selector */}
-                  <div>
-                    <label className="text-xs font-semibold text-zinc-300 block mb-2">
-                      Relación de Aspecto y Red Destino
-                    </label>
-                    <div className="grid grid-cols-3 gap-2.5">
-                      {[
-                        { id: '9:16', label: '9:16 Vertical', sub: 'TikTok / Shorts / Reels' },
-                        { id: '16:9', label: '16:9 Horizontal', sub: 'YouTube Largo' },
-                        { id: '1:1', label: '1:1 Cuadrado', sub: 'LinkedIn / Feed' },
-                      ].map((fmt) => (
-                        <button
-                          key={fmt.id}
-                          onClick={() =>
-                            setState((prev) => ({
-                              ...prev,
-                              aspectRatio: fmt.id as AspectRatioType,
-                            }))
-                          }
-                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                            state.aspectRatio === fmt.id
-                              ? 'bg-violet-600/20 border-violet-500 text-white'
-                              : 'bg-[#090A0F] border-white/10 text-zinc-400 hover:text-white'
-                          }`}
-                        >
-                          <div className="font-mono font-bold text-xs">{fmt.label}</div>
-                          <div className="text-[10px] text-zinc-400 mt-0.5">{fmt.sub}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Genre & Subgenre */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1.5">Categoría</label>
-                      <select
-                        value={state.genre}
-                        onChange={(e) => {
-                          const g = e.target.value;
-                          setState((prev) => ({
-                            ...prev,
-                            genre: g,
-                            subgenre: SUBGENRES[g]?.[0] || '',
-                          }));
-                        }}
-                        className="w-full bg-[#090A0F] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white"
-                      >
-                        {GENRES.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1.5">Enfoque</label>
-                      <select
-                        value={state.subgenre}
-                        onChange={(e) =>
-                          setState((prev) => ({ ...prev, subgenre: e.target.value }))
-                        }
-                        className="w-full bg-[#090A0F] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white"
-                      >
-                        {(SUBGENRES[state.genre] || []).map((sg) => (
-                          <option key={sg} value={sg}>
-                            {sg}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Duration & Language */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1.5">Duración Objetivo</label>
-                      <select
-                        value={state.duration}
-                        onChange={(e) =>
-                          setState((prev) => ({ ...prev, duration: e.target.value }))
-                        }
-                        className="w-full bg-[#090A0F] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-mono"
-                      >
-                        {DURATIONS.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1.5">Idioma del Video</label>
-                      <select
-                        value={state.language}
-                        onChange={(e) =>
-                          setState((prev) => ({ ...prev, language: e.target.value }))
-                        }
-                        className="w-full bg-[#090A0F] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white"
-                      >
-                        <option value="es">Español</option>
-                        <option value="en">Inglés (English)</option>
-                        <option value="pt">Portugués</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Idea / Prompt Input */}
-                  <div>
-                    <label className="text-xs font-semibold text-zinc-300 block mb-1.5">
-                      Tema, Tendencia o Idea del Video
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      placeholder="Describe la noticia, tendencia o tema sobre el que quieres generar el video..."
-                      className="w-full bg-[#090A0F] border border-white/10 rounded-xl p-3.5 text-sm text-white focus:outline-none focus:border-violet-500"
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleGenerateScript}
-                    disabled={isGeneratingScript}
-                    className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-violet-600/20"
-                  >
-                    {isGeneratingScript ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        Estructurando Guion y Escenas...
-                      </>
-                    ) : (
-                      <>
-                        <Wand2 className="w-4 h-4" />
-                        Generar Guion con Estructura Viral
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Right Column: Script & Scene Editor */}
-                <div className="lg:col-span-7 bg-[#11131C] border border-white/10 rounded-2xl p-6 flex flex-col justify-between space-y-5">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base font-bold text-white">
-                        Escenas y Diálogos ({scenes.length} escenas)
-                      </h3>
-                      <button
-                        onClick={() => {
-                          const newIdx = scenes.length + 1;
-                          const title = `Escena ${newIdx}: Plano cinematográfico detallado`;
-                          const dialogue = 'Nueva línea de narración para el video.';
-                          const built = buildStyleCoherentScenePrompt(
-                            title,
-                            dialogue,
-                            state.style,
-                            comfyConfig.architecture,
-                            state.visualBible
-                          );
-                          setScenes((prev) => [
-                            ...prev,
-                            {
-                              title,
-                              dialogue,
-                              cameraMotion: 'zoom_in',
-                              comfyPositivePrompt: built.positive,
-                              comfyNegativePrompt: built.negative,
-                              seed: comfyConfig.masterSeed,
-                            },
-                          ]);
-                        }}
-                        className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-semibold text-violet-300 flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" /> Añadir Escena
-                      </button>
-                    </div>
-
-                    {scenes.length === 0 ? (
-                      <div className="bg-[#090A0F] border border-white/5 rounded-xl p-10 text-center space-y-2">
-                        <Sparkles className="w-8 h-8 text-violet-400 mx-auto" />
-                        <p className="text-sm font-semibold text-white">
-                          Aún no has generado las escenas del guion
-                        </p>
-                        <p className="text-xs text-zinc-400 max-w-md mx-auto">
-                          Haz clic en «Generar Guion con Estructura Viral» o selecciona una tendencia desde el Radar en Vivo.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
-                        {scenes.map((scene, idx) => (
-                          <div
-                            key={idx}
-                            className="bg-[#090A0F] border border-white/10 rounded-xl p-4 space-y-2.5"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[11px] font-mono font-bold text-violet-400 uppercase">
-                                Escena #{idx + 1} (Descripción de Escena)
-                              </span>
-                              <button
-                                onClick={() =>
-                                  setScenes((prev) => prev.filter((_, i) => i !== idx))
-                                }
-                                className="text-zinc-500 hover:text-red-400 cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                            <input
-                              type="text"
-                              value={scene.title}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setScenes((prev) =>
-                                  prev.map((s, i) => (i === idx ? { ...s, title: val } : s))
-                                );
-                              }}
-                              className="w-full bg-[#11131C] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-zinc-200"
-                            />
-                            <div>
-                              <span className="text-[10px] font-mono uppercase text-zinc-500 block mb-1">
-                                Locución hablada:
-                              </span>
-                              <textarea
-                                rows={2}
-                                value={scene.dialogue}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setScenes((prev) =>
-                                    prev.map((s, i) => (i === idx ? { ...s, dialogue: val } : s))
-                                  );
-                                }}
-                                className="w-full bg-[#11131C] border border-white/10 rounded-lg p-2.5 text-xs text-white"
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-4 border-t border-white/10 flex justify-end">
-                    <button
-                      onClick={() => setState((prev) => ({ ...prev, step: 2 }))}
-                      disabled={scenes.length === 0}
-                      className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-2 cursor-pointer"
-                    >
-                      Siguiente: Locución por Escenas <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <ScriptStudioStep
+                activeChannel={activeChannel}
+                aspectRatio={state.aspectRatio}
+                onSelectAspectRatio={(ratio) =>
+                  setState((prev) => ({ ...prev, aspectRatio: ratio }))
+                }
+                genre={state.genre}
+                subgenre={state.subgenre}
+                onSelectGenre={(g, sg) =>
+                  setState((prev) => ({ ...prev, genre: g, subgenre: sg }))
+                }
+                duration={state.duration}
+                onSelectDuration={(d) =>
+                  setState((prev) => ({ ...prev, duration: d }))
+                }
+                language={state.language}
+                onSelectLanguage={(l) =>
+                  setState((prev) => ({ ...prev, language: l }))
+                }
+                prompt={prompt}
+                onChangePrompt={setPrompt}
+                sourceTrendTitle={sourceTrendTitle}
+                isGeneratingScript={isGeneratingScript}
+                onGenerateScript={handleGenerateScript}
+                scenes={scenes}
+                onUpdateScenes={setScenes}
+                visualBible={state.visualBible}
+                onUpdateVisualBible={(bible) =>
+                  setState((prev) => ({ ...prev, visualBible: bible }))
+                }
+                onNextStep={() => setState((prev) => ({ ...prev, step: 2 }))}
+              />
             )}
 
             {/* STEP 2: LOCUCIÓN POR ESCENAS (VOICE STUDIO) */}

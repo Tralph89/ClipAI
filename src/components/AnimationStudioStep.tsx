@@ -623,3 +623,4 @@ export const AnimationStudioStep: React.FC<AnimationStudioStepProps> = ({
     </div>
   );
 };
+

@@ -47,6 +47,10 @@ const STYLE_DESCRIPTIONS: Record<string, string> = {
     'Pixar Disney 3D animated film render, expressive character design, subsurface scattering, soft studio lighting, octane render, vivid colors, depth of field',
   cinematic:
     'Hollywood blockbuster cinematography, shot on ARRI Alexa 65 with 35mm anamorphic lens, volumetric rim lighting, shallow depth of field, color graded filmic masterpiece',
+  thriller:
+    'David Fincher and Denis Villeneuve psychological thriller aesthetic, shot on ARRI Alexa Mini LF, 35mm anamorphic lens, low-key practical lighting, bounce light, deep chiaroscuro shadows, moody desaturated palette, 8k cinematic realism',
+  suspense:
+    'gripping psychological suspense cinema, subtle 35mm film grain, low-key chiaroscuro lighting, deep mysterious shadows, authentic facial expressions, photorealistic tension, 8k',
   comic:
     'vintage American graphic novel art, bold dynamic ink line work, pop art halftone dot patterns, vibrant saturated colors, dramatic action perspective',
   fantasy:
@@ -716,6 +720,7 @@ export async function generateAndCacheSceneImage(params: {
   comfyNegativePrompt?: string;
   visualBible?: VisualBible;
   characterAnchor?: string;
+  antagonistAnchor?: string;
   environmentAnchor?: string;
   colorPalette?: string;
   lightingDirective?: string;
@@ -739,6 +744,11 @@ export async function generateAndCacheSceneImage(params: {
   const charAnchor = (
     params.characterAnchor ||
     params.visualBible?.characterAnchor ||
+    ''
+  ).trim();
+  const antagAnchor = (
+    params.antagonistAnchor ||
+    params.visualBible?.antagonistAnchor ||
     ''
   ).trim();
   const envAnchor = (
@@ -794,14 +804,15 @@ export async function generateAndCacheSceneImage(params: {
   } else {
     // Golden Anchor Formula composition
     const parts = [
-      'Masterpiece cinematic film still',
-      charAnchor && charAnchor.toLowerCase() !== 'none' ? `Subject: ${charAnchor}` : '',
+      'Masterpiece cinematic film still, shot on ARRI Alexa Mini LF, 35mm anamorphic lens, subtle 35mm grain',
+      charAnchor && charAnchor.toLowerCase() !== 'none' ? `Protagonist: ${charAnchor}` : '',
+      antagAnchor && antagAnchor.toLowerCase() !== 'none' ? `Antagonist/Secondary: ${antagAnchor}` : '',
       coreVisualAction,
       envAnchor && envAnchor.toLowerCase() !== 'none' ? `Setting: ${envAnchor}` : '',
       `Artistic direction: ${stylePrompt}`,
       colorPalette ? `Color grading: ${colorPalette}` : '',
-      lightingDir ? `Lighting: ${lightingDir}` : 'Volumetric cinematic lighting',
-      'Sharp detailed focus, 8k resolution, cinematic composition, photorealistic, no watermark, no text',
+      lightingDir ? `Lighting: ${lightingDir}` : 'Volumetric cinematic chiaroscuro lighting',
+      'Sharp detailed focus, 8k resolution, cinematic suspense framing, photorealistic, no watermark, no text',
     ].filter(Boolean);
     fullPrompt = parts.join('. ');
   }
@@ -1993,7 +2004,8 @@ export async function generateVisualsForAllScenes(params: {
     }
 
     // Fast local keyframe image fallback (Z-Image-Turbo / SD / Wikimedia)
-    const promptToUse = sc.imagePrompt || `${sc.title}. ${sc.dialogue.slice(0, 100)}`;
+    const promptToUse =
+      sc.imagePrompt || sc.visualDescription || `${sc.title}. ${sc.dialogue.slice(0, 100)}`;
     const aiResult = await generateAndCacheSceneImage({
       prompt: promptToUse,
       style: params.style,
