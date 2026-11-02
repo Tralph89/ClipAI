@@ -883,6 +883,38 @@ export async function generateAndCacheSceneImage(params: {
       }
 
       if (lastGeminiErr) {
+        console.warn(
+          '[visualEngine] Gemini image API quota agotada (429) o falló. Intentando fallback local ComfyUI / Pixabay HD...'
+        );
+        // Fallback A: ComfyUI Local SD si ComfyUI está activo
+        try {
+          const comfyImgBuf = await tryComfyUiImageGen(fullPrompt, width, height, seed, params.style);
+          if (comfyImgBuf) {
+            const imageUrl = await saveNormalizedImageBuffer(
+              comfyImgBuf,
+              subfolder,
+              prefix,
+              width,
+              height
+            );
+            return { imageUrl, provider: 'comfyui-sd-local', seedUsed: seed };
+          }
+        } catch {
+          // ignore ComfyUI error and fallback to Pixabay
+        }
+
+        // Fallback B: Pixabay Stock HD ($0)
+        try {
+          return await fetchPixabayStockImage({
+            query: params.prompt,
+            style: params.style,
+            aspectRatio,
+            stockKeywords: params.stockKeywords,
+          });
+        } catch {
+          // ignore
+        }
+
         const msg = lastGeminiErr.message || '';
         if (lastGeminiErr.status === 429 || msg.includes('429') || msg.includes('quota') || msg.includes('limit: 0')) {
           throw new Error(
@@ -1519,6 +1551,52 @@ export async function generateSceneWithLtxLocal(params: {
 }
 
 /**
+ * Robust reference image resolver for local video generation (Wan 2.1 / LTX).
+ * Handles absolute paths, /media/ paths, localhost URLs, data URLs, and remote stock URLs.
+ */
+export async function resolveVideoReferenceImagePath(imageUrl?: string): Promise<string | null> {
+  if (!imageUrl || typeof imageUrl !== 'string') return null;
+
+  // 1. Direct filesystem path check
+  if (fs.existsSync(imageUrl)) return path.resolve(imageUrl);
+
+  // 2. Base64 Data URL (data:image/...)
+  if (imageUrl.startsWith('data:image/')) {
+    const saved = saveDataUrlToMedia(imageUrl, 'images', `ref_${Date.now()}`);
+    return resolveMediaUrlToDiskPath(saved);
+  }
+
+  // 3. Localhost or 127.0.0.1 /media/ URL
+  const localMatch = imageUrl.match(/^https?:\/\/[^\/]+(\/media\/.*)$/i);
+  const normalizedUrl = localMatch ? localMatch[1] : imageUrl;
+  if (normalizedUrl.startsWith('/media/')) {
+    const candidate = resolveMediaUrlToDiskPath(normalizedUrl);
+    if (candidate && fs.existsSync(candidate)) return candidate;
+  }
+
+  // 4. Remote HTTP/HTTPS URL (e.g. Pixabay / Pexels)
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    try {
+      const resp = await fetch(imageUrl, { signal: AbortSignal.timeout(15_000) });
+      if (resp.ok) {
+        const buf = Buffer.from(await resp.arrayBuffer());
+        const ext = imageUrl.includes('.png') ? 'png' : 'jpg';
+        const filename = `downloaded_ref_${Date.now()}.${ext}`;
+        const dest = path.join(MEDIA_DIR, 'images', filename);
+        fs.mkdirSync(path.join(MEDIA_DIR, 'images'), { recursive: true });
+        fs.writeFileSync(dest, buf);
+        return dest;
+      }
+    } catch (err) {
+      console.warn('No se pudo descargar la imagen remota de referencia para video:', err);
+    }
+  }
+
+  const candidate = resolveMediaUrlToDiskPath(imageUrl);
+  return candidate && fs.existsSync(candidate) ? candidate : null;
+}
+
+/**
  * Generates video for a scene using local ComfyUI + Wan 2.1 I2V 14B.
  */
 export async function generateSceneWithWanComfyUI(params: {
@@ -1540,25 +1618,27 @@ export async function generateSceneWithWanComfyUI(params: {
   // Auto-boot ComfyUI service if not already online
   await startLocalVideoEngine('wan_comfyui', true);
 
-  // 1. Ensure reference start frame for Wan 2.1 I2V (use existing scene.imageUrl or generate reference)
-  let refImagePath = '';
-  if (params.scene.imageUrl && params.scene.imageUrl.startsWith('/media/')) {
-    const candidate = resolveMediaUrlToDiskPath(params.scene.imageUrl);
-    if (candidate && fs.existsSync(candidate)) refImagePath = candidate;
-  }
+  // 1. Ensure reference start frame for Wan 2.1 I2V
+  let refImagePath = await resolveVideoReferenceImagePath(params.scene.imageUrl);
+
+  // If no reference frame, attempt safe Pixabay HD ($0) fallback before failing
   if (!refImagePath) {
-    const imgGen = await generateAndCacheSceneImage({
-      prompt: params.scene.imagePrompt || params.scene.title,
-      style: params.style,
-      aspectRatio: params.aspectRatio,
-      seed: params.seed,
-      imagePrompt: params.scene.imagePrompt,
-      comfyPositivePrompt: params.scene.comfyPositivePrompt,
-      comfyNegativePrompt: params.scene.comfyNegativePrompt,
-    });
-    const candidate = resolveMediaUrlToDiskPath(imgGen.imageUrl);
-    refImagePath =
-      candidate && fs.existsSync(candidate) ? candidate : path.join(DATA_DIR, imgGen.imageUrl);
+    try {
+      const stockCandidate = await fetchPixabayStockImage({
+        query: params.scene.imagePrompt || params.scene.title || 'cinematic scene',
+        style: params.style,
+        aspectRatio: params.aspectRatio,
+      });
+      refImagePath = await resolveVideoReferenceImagePath(stockCandidate.imageUrl);
+    } catch (e) {
+      console.warn('Fallback a Pixabay para Wan 2.1 no disponible:', e);
+    }
+  }
+
+  if (!refImagePath || !fs.existsSync(refImagePath)) {
+    throw new Error(
+      'La escena no tiene una imagen base todavía. Wan 2.1 es un motor Image-to-Video: primero genera o añade una imagen en el Paso 4 (Visuales) para animarla.'
+    );
   }
 
   // Upload image to ComfyUI /upload/image
@@ -1654,7 +1734,7 @@ export async function generateSceneWithWanComfyUI(params: {
       inputs: {
         width,
         height,
-        num_frames: 25,
+        num_frames: 17,
         noise_aug_strength: 0.02,
         start_latent_strength: 1.0,
         end_latent_strength: 1.0,
@@ -1682,7 +1762,7 @@ export async function generateSceneWithWanComfyUI(params: {
         base_precision: 'bf16',
         quantization: 'fp8_e4m3fn',
         load_device: 'offload_device',
-        attention_mode: 'comfy',
+        attention_mode: 'sdpa',
         block_swap_args: ['8', 0],
       },
     },
@@ -1692,7 +1772,7 @@ export async function generateSceneWithWanComfyUI(params: {
         model: ['9', 0],
         image_embeds: ['7', 0],
         text_embeds: ['2', 0],
-        steps: 12,
+        steps: 10,
         cfg: 3.5,
         shift: 5.0,
         seed,

@@ -1111,7 +1111,10 @@ Devuelve un JSON con esta estructura exacta:
       if (engine === 'auto') {
         try {
           const cluster = await getLocalVideoClusterStatus();
-          const onlineEngine = cluster.engines.find((e) => e.status === 'ready' || e.status === 'busy');
+          const enginesList = Object.values(cluster.engines);
+          const onlineEngine = enginesList.find(
+            (e) => e.status === 'online' || e.status === 'ready' || e.status === 'busy'
+          );
           if (onlineEngine) {
             const localVid = await generateSceneLocalVideo({
               scene: sceneObj,
@@ -1127,8 +1130,8 @@ Devuelve un JSON con esta estructura exacta:
               provider: localVid.provider,
             });
           }
-        } catch {
-          // fallback to Ken Burns MP4
+        } catch (autoErr) {
+          console.warn('Auto video engine dispatch failed, falling back to Ken Burns:', autoErr);
         }
       }
 

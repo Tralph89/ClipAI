@@ -341,6 +341,7 @@ export async function getLocalVideoClusterStatus(): Promise<LocalVideoClusterSta
     recentLogs: logBuffers.ltx_local.slice(-8),
   };
 
+  const db = loadDb();
   return {
     gpuName: gpu.gpuName,
     vramTotalMb: gpu.vramTotalMb,

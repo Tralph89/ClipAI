@@ -303,10 +303,17 @@ export const AnimationStudioStep: React.FC<AnimationStudioStepProps> = ({
     const scene = scenes[index];
     if (!scene) return;
 
+    if (engine === 'wan_comfyui' && !scene.imageUrl) {
+      alert(
+        `La Escena #${index + 1} no tiene una imagen base todavía.\n\nWan 2.1 es un motor Image-to-Video: primero genera o añade una imagen para esta escena en el Paso 4 (Visuales), y luego haz clic en "Video GPU (Wan 2.1)" para animarla con tu RTX 5090.`
+      );
+      return;
+    }
+
     setAnimatingIndices((prev) => ({ ...prev, [index]: true }));
     setStatusText(
       engine === 'wan_comfyui'
-        ? `Renderizando clip con GPU Local Wan 2.1 (Escena ${index + 1})...`
+        ? `Renderizando clip con GPU Local Wan 2.1 en tu RTX 5090 (Escena ${index + 1})... (~1-2 min)`
         : engine === 'ltx_local'
         ? `Renderizando clip con GPU Local LTX 2.3 (Escena ${index + 1})...`
         : `Generando clip fluido Ken Burns MP4 60fps (Escena ${index + 1})...`
@@ -458,6 +465,17 @@ export const AnimationStudioStep: React.FC<AnimationStudioStepProps> = ({
                     </button>
                   )}
 
+                  {/* Empty image placeholder notice */}
+                  {!hasVideoClip && !scene.imageUrl && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-zinc-950/80 pointer-events-none">
+                      <Film className="w-7 h-7 text-zinc-600 mb-2" />
+                      <span className="text-xs font-semibold text-zinc-300">Sin imagen base</span>
+                      <span className="text-[10px] text-zinc-500 mt-1 max-w-[190px]">
+                        Genera o sube la imagen en el Paso 4 (Visuales) para animarla con Wan 2.1
+                      </span>
+                    </div>
+                  )}
+
                   {/* Generating Spinner Overlay */}
                   {isAnimatingThis && (
                     <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center gap-2 p-4 text-center z-10">
@@ -582,20 +600,26 @@ export const AnimationStudioStep: React.FC<AnimationStudioStepProps> = ({
                     </button>
 
                     <button
-                      onClick={() =>
-                        handleAnimateScene(
-                          idx,
-                          clusterStatus?.preferredEngine === 'wan_comfyui'
-                            ? 'wan_comfyui'
-                            : 'auto'
-                        )
-                      }
+                      onClick={() => handleAnimateScene(idx, 'wan_comfyui')}
                       disabled={isAnimatingThis}
                       className="py-2 px-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/40 text-emerald-300 hover:text-white text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all"
-                      title="Genera movimiento de video real Image-to-Video usando tu GPU RTX 5090"
+                      title={
+                        scene.imageUrl
+                          ? "Genera movimiento de video real Image-to-Video usando tu GPU RTX 5090"
+                          : "Esta escena requiere una imagen base (Paso 4: Visuales)"
+                      }
                     >
-                      <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-                      Video GPU (Wan 2.1)
+                      {isAnimatingThis ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                          <span>Animando RTX 5090...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Video GPU (Wan 2.1)</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 )}
