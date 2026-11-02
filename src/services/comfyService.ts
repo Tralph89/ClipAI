@@ -29,44 +29,63 @@ export function getComfyDimensions(aspectRatio: AspectRatioType): {
 
 /**
  * Deterministic client-side prompt builder so every scene immediately has a valid,
- * style-coherent Positive & Negative prompt even before running the AI Visual Director.
+ * style-coherent Positive & Negative prompt incorporating the Visual Bible anchors.
+ * Prioritizes English sceneImagePrompt over raw Spanish dialogue so audio narration
+ * is never sent to image generation models.
  */
 export function buildStyleCoherentScenePrompt(
   sceneTitle: string,
   sceneDialogue: string,
   styleId: string,
   architecture: 'flux1' | 'sdxl' | 'custom_json',
-  visualBible?: VisualBible
+  visualBible?: VisualBible,
+  sceneImagePrompt?: string
 ): { positive: string; negative: string } {
   const styleProfile: StyleTechnicalProfile =
     VIDEO_STYLES.find((s) => s.id === styleId) || VIDEO_STYLES[0];
 
-  const charPart = visualBible?.characterAnchor
-    ? `Consistent subject: ${visualBible.characterAnchor}.`
-    : '';
-  const envPart = visualBible?.environmentAnchor
-    ? `Consistent setting: ${visualBible.environmentAnchor}.`
-    : '';
+  const charPart =
+    visualBible?.characterAnchor && visualBible.characterAnchor.toLowerCase() !== 'none'
+      ? `Consistent key subject: ${visualBible.characterAnchor}.`
+      : '';
+  const envPart =
+    visualBible?.environmentAnchor && visualBible.environmentAnchor.toLowerCase() !== 'none'
+      ? `Consistent environment setting: ${visualBible.environmentAnchor}.`
+      : '';
   const colorPart = visualBible?.colorPalette
-    ? `Color palette: ${visualBible.colorPalette}.`
+    ? `Color grading: ${visualBible.colorPalette}.`
     : '';
+  const lightingPart = visualBible?.lightingDirective
+    ? `Lighting directive: ${visualBible.lightingDirective}.`
+    : `Lighting: ${styleProfile.cameraAndLighting}.`;
 
-  const cleanAction = `${sceneTitle}. ${sceneDialogue.slice(0, 120)}`.replace(/\s+/g, ' ').trim();
+  // Core visual action: strictly prefer English visual camera prompt over Spanish dialogue
+  let cleanVisualAction = '';
+  if (sceneImagePrompt && sceneImagePrompt.trim().length > 10) {
+    cleanVisualAction = sceneImagePrompt.trim();
+  } else {
+    const cleanedTitle = sceneTitle
+      .replace(/^(Escena\s*\d+:?\s*)/i, '')
+      .replace(/\[.*?\]/g, '')
+      .trim();
+    cleanVisualAction = `Cinematic scene depicting ${cleanedTitle}`;
+  }
 
   if (architecture === 'sdxl') {
     const positive = [
       styleProfile.sdxlTags,
       charPart,
-      cleanAction,
+      cleanVisualAction,
       envPart,
       colorPart,
-      styleProfile.cameraAndLighting,
+      lightingPart,
+      '8k, high quality, photorealistic, sharp focus',
     ]
       .filter(Boolean)
-      .join(' ');
+      .join(', ');
     return {
       positive,
-      negative: styleProfile.negativePrompt,
+      negative: styleProfile.negativePrompt || 'lowres, blurry, watermark, text, deformed',
     };
   }
 
@@ -74,17 +93,18 @@ export function buildStyleCoherentScenePrompt(
   const positive = [
     styleProfile.fluxPrefix,
     charPart,
-    `Scene action: ${cleanAction}.`,
+    `Scene composition: ${cleanVisualAction}.`,
     envPart,
     colorPart,
-    `Lighting & Camera: ${styleProfile.cameraAndLighting}.`,
+    lightingPart,
+    'Cinematic composition, highly detailed, photorealistic, 8k resolution, crisp focus, no text, no watermark.',
   ]
     .filter(Boolean)
     .join(' ');
 
   return {
     positive,
-    negative: styleProfile.negativePrompt,
+    negative: styleProfile.negativePrompt || 'lowres, blurry, watermark, text, deformed',
   };
 }
 

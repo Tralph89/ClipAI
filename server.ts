@@ -492,6 +492,7 @@ ensureStorageDirectories();
 
   // =========================================================================
   // 3b. AI Visual Bible & ComfyUI Prompt Director (Guarantees Style & Scene Coherence)
+  // Multi-Provider: Local Ollama on RTX 5090 first, Gemini fallback
   // =========================================================================
   app.post('/api/visuals/craft-prompts', async (req, res) => {
     try {
@@ -503,19 +504,10 @@ ensureStorageDirectories();
         existingVisualBible,
       } = req.body;
 
-      const db = loadDb();
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || db.settings.geminiApiKey;
-      if (!apiKey) {
-        return res.status(400).json({ error: 'Configura tu clave de Gemini API en Ajustes para generar prompts de ComfyUI.' });
-      }
-
-      const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({ apiKey });
-
       const archInstructions =
         architecture === 'sdxl'
           ? `Arquitectura destino: SDXL (Stable Diffusion XL + LoRA).
-Formato de Positive Prompt requerido: Tags descriptivos en INGLÉS separados por comas, iniciando OBLIGATORIAMENTE con "${styleProfile?.sdxlTags || '(masterpiece, best quality:1.3)'}", seguido de la descripción consistente del personaje/sujeto ancla, la acción de la escena, el entorno consistente y cerrando con "${styleProfile?.cameraAndLighting || 'dramatic lighting, 8k'}".`
+Formato de Positive Prompt requerido: Tags descriptivos en INGLÉS separados por comas, iniciando OBLIGATORIAMENTE con "${styleProfile?.sdxlTags || '(masterpiece, best quality:1.3)'}", seguido de la descripción consistente del personaje/sujeto ancla, la acción visual de la escena, el entorno consistente y cerrando con "${styleProfile?.cameraAndLighting || 'dramatic lighting, 8k'}".`
           : `Arquitectura destino: Flux.1 (Dev / Schnell).
 Formato de Positive Prompt requerido: Oraciones descriptivas ricas en INGLÉS (lenguaje natural de alta precisión), iniciando OBLIGATORIAMENTE con "${styleProfile?.fluxPrefix || 'Cinematic high-detail visual,'}", seguido de la descripción exacta e invariable del personaje/sujeto ancla, la composición de la escena en formato ${aspectRatio}, el entorno y cerrando con "${styleProfile?.cameraAndLighting || 'dramatic lighting'}".`;
 
@@ -524,8 +516,9 @@ Necesitamos que TODAS las escenas de este video tengan una coherencia visual abs
 
 ${archInstructions}
 
-Regla crítica de Estilo:
+Reglas críticas de producción visual y anclas:
 - PROHIBIDO mezclar estilos distintos. Si el estilo es "${styleProfile?.name}", cada escena debe reflejar inequívocamente la estética "${styleProfile?.name}".
+- PROHIBIDO incluir el texto de la locución hablada en español en el prompt de imagen. Describe únicamente lo que la cámara ve en INGLÉS.
 - Negative Prompt base obligatorio: "${styleProfile?.negativePrompt || 'lowres, blurry, watermark, text, deformed'}"
 ${
   existingVisualBible?.characterAnchor
@@ -542,7 +535,7 @@ Escenas del proyecto:
 ${scenes
   .map(
     (s: any, i: number) =>
-      `Escena ${i + 1}: Visual original="${s.title}" | Diálogo="${s.dialogue}"`
+      `Escena ${i + 1}: Composición visual="${s.imagePrompt || s.title}" | Idea narrativa="${s.title}"`
   )
   .join('\n')}
 
@@ -563,17 +556,37 @@ Devuelve un JSON con esta estructura exacta:
   ]
 }`;
 
-      const modelName = db.settings.geminiModel || 'gemini-2.5-flash';
-      const response = await ai.models.generateContent({
-        model: modelName,
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
+      const { data } = await generateAIJson<{
+        visualBible?: {
+          characterAnchor?: string;
+          environmentAnchor?: string;
+          colorPalette?: string;
+          lightingDirective?: string;
+        };
+        scenePrompts?: Array<{
+          sceneIndex: number;
+          comfyPositivePrompt: string;
+          comfyNegativePrompt: string;
+        }>;
+      }>(
+        {
+          systemInstruction:
+            'Eres un Director de Fotografía e Ingeniero de Prompts de ComfyUI (Flux/SDXL). Respondes estrictamente en JSON válido.',
+          prompt,
+          temperature: 0.5,
         },
-      });
+        {
+          visualBible: {
+            characterAnchor: existingVisualBible?.characterAnchor || '',
+            environmentAnchor: existingVisualBible?.environmentAnchor || '',
+            colorPalette: existingVisualBible?.colorPalette || 'cinematic palette',
+            lightingDirective: existingVisualBible?.lightingDirective || 'dramatic volumetric lighting',
+          },
+          scenePrompts: [],
+        }
+      );
 
-      const parsed = JSON.parse(response.text || '{}');
-      res.json(parsed);
+      res.json(data);
     } catch (error: any) {
       console.error('Error crafting ComfyUI prompts:', error);
       res.status(500).json({
@@ -641,6 +654,14 @@ Devuelve un JSON con esta estructura exacta:
         engineSource = 'local',
         stockKeywords,
         seed,
+        imagePrompt,
+        comfyPositivePrompt,
+        comfyNegativePrompt,
+        visualBible,
+        characterAnchor,
+        environmentAnchor,
+        colorPalette,
+        lightingDirective,
       } = req.body || {};
 
       const result = await generateAndCacheSceneImage({
@@ -650,6 +671,14 @@ Devuelve un JSON con esta estructura exacta:
         engineSource: engineSource as VisualInitialSource,
         stockKeywords,
         seed,
+        imagePrompt,
+        comfyPositivePrompt,
+        comfyNegativePrompt,
+        visualBible,
+        characterAnchor,
+        environmentAnchor,
+        colorPalette,
+        lightingDirective,
       });
 
       res.json({
@@ -696,6 +725,9 @@ Devuelve un JSON con esta estructura exacta:
           engineSource: engineSource as VisualInitialSource,
           stockKeywords: sc.stockKeywords,
           seed: baseSeed + i * 19,
+          imagePrompt: sc.imagePrompt,
+          comfyPositivePrompt: sc.comfyPositivePrompt,
+          comfyNegativePrompt: sc.comfyNegativePrompt,
         });
 
         updatedScenes.push({
@@ -726,6 +758,14 @@ Devuelve un JSON con esta estructura exacta:
         engineSource = 'local',
         seed,
         stockKeywords,
+        imagePrompt,
+        comfyPositivePrompt,
+        comfyNegativePrompt,
+        visualBible,
+        characterAnchor,
+        environmentAnchor,
+        colorPalette,
+        lightingDirective,
       } = req.body || {};
 
       const result = await generateAndCacheSceneImage({
@@ -736,6 +776,14 @@ Devuelve un JSON con esta estructura exacta:
         engineSource: engineSource as VisualInitialSource,
         seed,
         stockKeywords,
+        imagePrompt,
+        comfyPositivePrompt,
+        comfyNegativePrompt,
+        visualBible,
+        characterAnchor,
+        environmentAnchor,
+        colorPalette,
+        lightingDirective,
       });
 
       res.json(result);

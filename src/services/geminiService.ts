@@ -41,7 +41,14 @@ export async function generateScript(
   aspectRatio: AspectRatioType = '9:16',
   channelTone?: string,
   trendContext?: string
-): Promise<string> {
+): Promise<{
+  hook?: string;
+  scenes?: Scene[];
+  visualBible?: VisualBible;
+  script: string;
+  providerUsed?: string;
+  modelUsed?: string;
+}> {
   const response = await fetch('/api/script', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -60,7 +67,7 @@ export async function generateScript(
   if (!response.ok) {
     throw new Error(data.error || 'Error al generar el guion.');
   }
-  return data.script;
+  return data;
 }
 
 export async function craftVisualBibleAndPrompts(params: {
@@ -112,6 +119,7 @@ export async function generateSceneImage(
   aspectRatio: AspectRatioType = '9:16',
   isThumbnail: boolean = false,
   extraOptions?: {
+    imagePrompt?: string;
     comfyPositivePrompt?: string;
     comfyNegativePrompt?: string;
     visualBible?: VisualBible;

@@ -507,19 +507,50 @@ GANCHO EXPLOSIVO (0-3s): "${trend.suggestedHook}"`;
           return `${trend.whyTrending} (${trend.summary}). Enfoque: ${trend.angle || activeChannel.tone}. Hook: "${trend.suggestedHook}"`;
         })()
       );
-      const parsedScenes = parseScriptIntoScenes(
-        generated,
-        nextState.style,
-        comfyConfig,
-        nextState.visualBible
-      );
-      const updatedState = { ...nextState, script: generated };
+
+      let parsedScenes: Scene[] = [];
+      let finalScript = '';
+      let visualBibleToSet = nextState.visualBible;
+
+      if (generated && typeof generated === 'object' && Array.isArray(generated.scenes) && generated.scenes.length > 0) {
+        finalScript = generated.script || '';
+        if (generated.visualBible) {
+          visualBibleToSet = {
+            ...generated.visualBible,
+            lastSyncedStyle: nextState.style,
+          };
+        }
+        parsedScenes = generated.scenes.map((s) => {
+          const built = buildStyleCoherentScenePrompt(
+            s.title,
+            s.dialogue,
+            nextState.style,
+            comfyConfig.architecture,
+            visualBibleToSet,
+            s.imagePrompt
+          );
+          return {
+            ...s,
+            comfyPositivePrompt: s.comfyPositivePrompt || built.positive,
+            comfyNegativePrompt: s.comfyNegativePrompt || built.negative,
+            seed: comfyConfig.seedLock
+              ? comfyConfig.masterSeed
+              : Math.floor(10000000 + Math.random() * 90000000),
+          };
+        });
+      } else {
+        const rawScript = typeof generated === 'string' ? generated : (generated as any)?.script || '';
+        finalScript = rawScript;
+        parsedScenes = parseScriptIntoScenes(rawScript, nextState.style, comfyConfig, visualBibleToSet);
+      }
+
+      const updatedState = { ...nextState, script: finalScript, visualBible: visualBibleToSet };
       setState(updatedState);
       setScenes(parsedScenes);
       saveCurrentProjectSnapshot(updatedState, parsedScenes, newPrompt);
       setStatusMessage({
         type: 'success',
-        text: `Guion generado con ${parsedScenes.length} escenas coherentes listas para producir.`,
+        text: `Guion generado con ${parsedScenes.length} escenas coherentes y Biblia Visual activa.`,
       });
     } catch (err: any) {
       setStatusMessage({
@@ -546,19 +577,50 @@ GANCHO EXPLOSIVO (0-3s): "${trend.suggestedHook}"`;
         state.aspectRatio,
         activeChannel.tone
       );
-      const parsedScenes = parseScriptIntoScenes(
-        generated,
-        state.style,
-        comfyConfig,
-        state.visualBible
-      );
-      const nextState = { ...state, script: generated };
+
+      let parsedScenes: Scene[] = [];
+      let finalScript = '';
+      let visualBibleToSet = state.visualBible;
+
+      if (generated && typeof generated === 'object' && Array.isArray(generated.scenes) && generated.scenes.length > 0) {
+        finalScript = generated.script || '';
+        if (generated.visualBible) {
+          visualBibleToSet = {
+            ...generated.visualBible,
+            lastSyncedStyle: state.style,
+          };
+        }
+        parsedScenes = generated.scenes.map((s) => {
+          const built = buildStyleCoherentScenePrompt(
+            s.title,
+            s.dialogue,
+            state.style,
+            comfyConfig.architecture,
+            visualBibleToSet,
+            s.imagePrompt
+          );
+          return {
+            ...s,
+            comfyPositivePrompt: s.comfyPositivePrompt || built.positive,
+            comfyNegativePrompt: s.comfyNegativePrompt || built.negative,
+            seed: comfyConfig.seedLock
+              ? comfyConfig.masterSeed
+              : Math.floor(10000000 + Math.random() * 90000000),
+          };
+        });
+      } else {
+        const rawScript = typeof generated === 'string' ? generated : (generated as any)?.script || '';
+        finalScript = rawScript;
+        parsedScenes = parseScriptIntoScenes(rawScript, state.style, comfyConfig, visualBibleToSet);
+      }
+
+      const nextState = { ...state, script: finalScript, visualBible: visualBibleToSet };
       setState(nextState);
       setScenes(parsedScenes);
       saveCurrentProjectSnapshot(nextState, parsedScenes, prompt);
       setStatusMessage({
         type: 'success',
-        text: `¡Guion completado con ${parsedScenes.length} escenas!`,
+        text: `¡Guion completado con ${parsedScenes.length} escenas y anclas visuales consistentes!`,
       });
     } catch (err: any) {
       setStatusMessage({ type: 'error', text: err.message || 'No se pudo generar el guion.' });
@@ -767,7 +829,8 @@ GANCHO EXPLOSIVO (0-3s): "${trend.suggestedHook}"`;
       scene.dialogue,
       state.style,
       comfyConfig.architecture,
-      state.visualBible
+      state.visualBible,
+      scene.imagePrompt
     );
     const positivePrompt = scene.comfyPositivePrompt || built.positive;
     const negativePrompt = scene.comfyNegativePrompt || built.negative;
@@ -809,12 +872,15 @@ GANCHO EXPLOSIVO (0-3s): "${trend.suggestedHook}"`;
 
     // Cloud Coherent Fallback (uses the exact same Visual Bible, Style Profile & Locked Seed)
     const startCloud = performance.now();
+    // NEVER pass raw Spanish dialogue to image models; use imagePrompt or positivePrompt
+    const promptForImageModel = scene.imagePrompt || positivePrompt;
     const cloudUrl = await generateSceneImage(
-      `${scene.title}. ${scene.dialogue.slice(0, 100)}`,
+      promptForImageModel,
       state.style,
       state.aspectRatio,
       false,
       {
+        imagePrompt: scene.imagePrompt,
         comfyPositivePrompt: positivePrompt,
         comfyNegativePrompt: negativePrompt,
         visualBible: state.visualBible,

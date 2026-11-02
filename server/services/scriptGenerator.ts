@@ -2,6 +2,7 @@ import {
   AspectRatioType,
   CameraMotionType,
   Scene,
+  VisualBible,
 } from '../../src/types.ts';
 import { generateAIJson, generateAIText } from './aiProvider.ts';
 
@@ -158,6 +159,7 @@ export async function generateStructuredViralScript(params: {
 }): Promise<{
   hook: string;
   scenes: Scene[];
+  visualBible?: VisualBible;
   script: string;
   providerUsed: string;
   modelUsed: string;
@@ -195,19 +197,32 @@ Reglas estrictas de retención y producción:
 2. La Escena 1 DEBE abrir con un Hook verbal explosivo en los primeros 3 segundos que detenga el scroll de inmediato (prohibido saludar con "Hola amigos" o "Bienvenidos").
 3. "dialogue" debe contener ÚNICAMENTE el texto limpio que leerá el sintetizador de voz neural en ${langLabel} (sin acotaciones entre paréntesis, sin emojis, sin escribir "Narrador:").
 4. "title" es la descripción visual clara en español para el editor.
-5. "imagePrompt" DEBE estar en INGLÉS detallado y cinematográfico (${framingHint}, subject, lighting, environment, no text).
-6. "stockKeywords" DEBE contener de 2 a 4 términos cortos en INGLÉS ideales para buscar clips reales B-Roll en Pexels/Pixabay (ej. ["robot hand", "data center", "stock market chart"]).
-7. "cameraMotion" debe alternar entre: "zoom_in", "zoom_out", "pan_right", "pan_left", "pulse".
-8. La última escena debe cerrar con una conclusión memorable y un llamado a la acción orgánico.
+5. "visualBible" (Biblia Visual): Define las anclas visuales consistentes para TODO el video:
+   - "characterAnchor": Descripción física y visual precisa en INGLÉS del protagonista recurrente o sujeto clave (edad, vestimenta, rasgos, estilo). Si el video no tiene personaje humano, describir la entidad o elemento principal recurrente (o "None" si es puramente documental de paisajes).
+   - "environmentAnchor": Descripción visual en INGLÉS del entorno, época, ubicación y arquitectura recurrente.
+   - "colorPalette": Paleta cromática dominante en INGLÉS (ej. "cold desaturated tones with deep cyan shadows", "warm golden hour hues").
+   - "lightingDirective": Estilo de iluminación en INGLÉS (ej. "volumetric chiaroscuro moody lighting, sharp shadows").
+6. "imagePrompt": OBLIGATORIAMENTE en INGLÉS cinematográfico (${framingHint}).
+   - PROHIBIDO poner el texto de la locución hablada o diálogo aquí.
+   - Debe describir la composición visual de la cámara, el sujeto (respetando characterAnchor), la acción física visible que ocurre en esta escena específica, el entorno (respetando environmentAnchor) y la iluminación.
+7. "stockKeywords" DEBE contener de 2 a 4 términos cortos en INGLÉS ideales para buscar clips reales B-Roll en Pexels/Pixabay (ej. ["robot hand", "data center", "stock market chart"]).
+8. "cameraMotion" debe alternar entre: "zoom_in", "zoom_out", "pan_right", "pan_left", "pulse".
+9. La última escena debe cerrar con una conclusión memorable y un llamado a la acción orgánico.
 
 Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta:
 {
   "hook": "Frase inicial exacta de los primeros 3 segundos",
+  "visualBible": {
+    "characterAnchor": "English physical description of recurring subject or character",
+    "environmentAnchor": "English visual description of recurring world/environment",
+    "colorPalette": "English color palette and grading",
+    "lightingDirective": "English lighting and camera style"
+  },
   "scenes": [
     {
       "title": "Descripción visual en español de la escena",
       "dialogue": "Locución hablada limpia lista para voz neural",
-      "imagePrompt": "Detailed English cinematic visual prompt for ${framingHint}",
+      "imagePrompt": "Detailed English cinematic camera shot description with subject, action, lighting, framing, 8k",
       "stockKeywords": ["english keyword 1", "english keyword 2"],
       "cameraMotion": "zoom_in"
     }
@@ -216,6 +231,12 @@ Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta:
 
   const { data, meta } = await generateAIJson<{
     hook?: string;
+    visualBible?: {
+      characterAnchor?: string;
+      environmentAnchor?: string;
+      colorPalette?: string;
+      lightingDirective?: string;
+    };
     scenes?: Array<{
       title?: string;
       dialogue?: string;
@@ -232,6 +253,22 @@ Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta:
     },
     { hook: '', scenes: [] }
   );
+
+  const rawVisualBible = data?.visualBible;
+  const visualBible: VisualBible = {
+    characterAnchor: String(rawVisualBible?.characterAnchor || '').trim(),
+    environmentAnchor: String(rawVisualBible?.environmentAnchor || '').trim(),
+    colorPalette: String(rawVisualBible?.colorPalette || 'cinematic moody tones').trim(),
+    lightingDirective: String(rawVisualBible?.lightingDirective || 'cinematic volumetric lighting').trim(),
+  };
+
+  // Provide robust defaults if the model left anchors blank
+  if (!visualBible.characterAnchor && params.prompt) {
+    visualBible.characterAnchor = `Key central subject relating to ${params.prompt.slice(0, 50)}`;
+  }
+  if (!visualBible.environmentAnchor) {
+    visualBible.environmentAnchor = `Atmospheric ${params.genre || 'cinematic'} setting with authentic mood`;
+  }
 
   const rawScenes = Array.isArray(data?.scenes) ? data.scenes : [];
   const validMotions = new Set<string>(CAMERA_MOTIONS);
@@ -253,14 +290,18 @@ Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta:
             .slice(0, 4)
         : [];
 
+      const rawPrompt = String(item.imagePrompt || '').trim();
+      const imagePrompt =
+        rawPrompt.length > 15
+          ? rawPrompt
+          : `Cinematic ${framingHint}, atmospheric scene depicting ${item.title || 'dramatic moment'}, subject: ${visualBible.characterAnchor}, setting: ${visualBible.environmentAnchor}, ${visualBible.lightingDirective}, ${visualBible.colorPalette}, 8k photorealistic`;
+
       const sceneObj: Scene = {
         title: String(item.title || `Escena ${idx + 1}: Plano cinematográfico`).trim(),
         dialogue,
         hookText: idx === 0 ? String(data?.hook || dialogue.slice(0, 90)).trim() : undefined,
-        imagePrompt:
-          String(item.imagePrompt || '').trim() ||
-          `Cinematic ${framingHint}, dramatic lighting: ${item.title || dialogue.slice(0, 90)}`,
-        stockKeywords: keywords.length > 0 ? keywords : ['technology', 'cinematic'],
+        imagePrompt,
+        stockKeywords: keywords.length > 0 ? keywords : ['cinematic', 'high quality'],
         cameraMotion,
       };
       return sceneObj;
@@ -285,6 +326,7 @@ Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta:
   return {
     hook,
     scenes: normalizedScenes,
+    visualBible,
     script: legacyScript,
     providerUsed: meta.providerUsed,
     modelUsed: meta.modelUsed,

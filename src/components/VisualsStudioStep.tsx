@@ -19,6 +19,11 @@ import {
   Eye,
   Layers,
   Terminal,
+  Upload,
+  Film,
+  Search,
+  UserCheck,
+  Compass,
 } from 'lucide-react';
 import {
   AspectRatioType,
@@ -35,6 +40,10 @@ import {
   checkComfyConnection,
   getComfyDimensions,
 } from '../services/comfyService';
+import {
+  acquireSceneStockBrollOnServer,
+  uploadBlobUrlToDisk,
+} from '../services/apiService';
 
 interface VisualsStudioStepProps {
   scenes: Scene[];
@@ -122,6 +131,9 @@ export const VisualsStudioStep: React.FC<VisualsStudioStepProps> = ({
     }
   };
 
+  const [loadingBrollIndex, setLoadingBrollIndex] = useState<number | null>(null);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+
   // Auto-populate technical prompts whenever style or architecture changes if scenes don't have one yet
   useEffect(() => {
     scenes.forEach((s, idx) => {
@@ -131,7 +143,8 @@ export const VisualsStudioStep: React.FC<VisualsStudioStepProps> = ({
           s.dialogue,
           selectedStyleId,
           comfyConfig.architecture,
-          visualBible
+          visualBible,
+          s.imagePrompt
         );
         onUpdateScene(idx, {
           comfyPositivePrompt: built.positive,
@@ -143,6 +156,90 @@ export const VisualsStudioStep: React.FC<VisualsStudioStepProps> = ({
       }
     });
   }, [selectedStyleId, comfyConfig.architecture]);
+
+  const handleReapplyAnchors = (index: number) => {
+    const scene = scenes[index];
+    if (!scene) return;
+    const built = buildStyleCoherentScenePrompt(
+      scene.title,
+      scene.dialogue,
+      selectedStyleId,
+      comfyConfig.architecture,
+      visualBible,
+      scene.imagePrompt
+    );
+    onUpdateScene(index, {
+      comfyPositivePrompt: built.positive,
+      comfyNegativePrompt: built.negative,
+    });
+  };
+
+  const handleReapplyAnchorsToAll = () => {
+    scenes.forEach((scene, index) => {
+      const built = buildStyleCoherentScenePrompt(
+        scene.title,
+        scene.dialogue,
+        selectedStyleId,
+        comfyConfig.architecture,
+        visualBible,
+        scene.imagePrompt
+      );
+      onUpdateScene(index, {
+        comfyPositivePrompt: built.positive,
+        comfyNegativePrompt: built.negative,
+      });
+    });
+  };
+
+  const handleAcquireBroll = async (index: number) => {
+    const scene = scenes[index];
+    if (!scene) return;
+    setLoadingBrollIndex(index);
+    try {
+      const broll = await acquireSceneStockBrollOnServer(scene, aspectRatio);
+      onUpdateScene(index, {
+        imageUrl: broll.posterImageUrl || broll.videoClipUrl,
+        videoUrl: broll.videoClipUrl,
+        sourceType: 'stock',
+        visualMode: 'stock_broll',
+      });
+    } catch (err: any) {
+      alert(`No se pudo obtener clip de stock: ${err.message || 'Error desconocido'}`);
+    } finally {
+      setLoadingBrollIndex(null);
+    }
+  };
+
+  const handleCustomFileUpload = async (index: number, file: File) => {
+    if (!file) return;
+    setUploadingIndex(index);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const dataUrl = reader.result as string;
+          const mediaUrl = await uploadBlobUrlToDisk(dataUrl, 'images', `scene_${index + 1}_user`);
+          onUpdateScene(index, {
+            imageUrl: mediaUrl,
+            sourceType: 'user_upload',
+            visualMode: 'ai_still',
+          });
+        } catch (uErr: any) {
+          alert(`Error al guardar imagen en servidor: ${uErr.message}`);
+        } finally {
+          setUploadingIndex(null);
+        }
+      };
+      reader.onerror = () => {
+        alert('Error al leer el archivo seleccionado.');
+        setUploadingIndex(null);
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      alert(`Error al procesar archivo: ${err.message}`);
+      setUploadingIndex(null);
+    }
+  };
 
   const handleRandomizeMasterSeed = () => {
     const nextSeed = Math.floor(10000000 + Math.random() * 90000000);
@@ -505,6 +602,16 @@ export const VisualsStudioStep: React.FC<VisualsStudioStepProps> = ({
 
           <div className="flex flex-wrap items-center gap-2.5">
             <button
+              onClick={handleReapplyAnchorsToAll}
+              disabled={scenes.length === 0}
+              className="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+              title="Aplica las anclas de personaje y entorno a los prompts técnicos de todas las escenas"
+            >
+              <Compass className="w-4 h-4 text-emerald-400" />
+              Re-aplicar Anclas a Todas
+            </button>
+
+            <button
               onClick={onSyncVisualBibleWithAI}
               disabled={isCraftingPrompts || scenes.length === 0}
               className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-600/20"
@@ -778,6 +885,33 @@ export const VisualsStudioStep: React.FC<VisualsStudioStepProps> = ({
                     </p>
                   </div>
 
+                  {/* Active Anchors Visual Badges */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    {visualBible?.characterAnchor ? (
+                      <span
+                        title={`Ancla Sujeto: ${visualBible.characterAnchor}`}
+                        className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-mono text-emerald-300 flex items-center gap-1 max-w-[210px] truncate"
+                      >
+                        <UserCheck className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{visualBible.characterAnchor}</span>
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-zinc-800 text-[10px] font-mono text-zinc-400">
+                        Sin ancla de sujeto
+                      </span>
+                    )}
+
+                    {visualBible?.environmentAnchor ? (
+                      <span
+                        title={`Ancla Entorno: ${visualBible.environmentAnchor}`}
+                        className="px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/30 text-[10px] font-mono text-violet-300 flex items-center gap-1 max-w-[210px] truncate"
+                      >
+                        <Compass className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{visualBible.environmentAnchor}</span>
+                      </span>
+                    ) : null}
+                  </div>
+
                   <button
                     onClick={() =>
                       setExpandedScenePrompts((prev) => ({
@@ -789,13 +923,40 @@ export const VisualsStudioStep: React.FC<VisualsStudioStepProps> = ({
                   >
                     <span className="flex items-center gap-1.5">
                       <Code2 className="w-3.5 h-3.5" />
-                      Prompt Técnico ComfyUI ({comfyConfig.architecture.toUpperCase()})
+                      Prompt Técnico ({comfyConfig.architecture.toUpperCase()})
                     </span>
                     <span>{isExpanded ? 'Ocultar' : 'Editar Prompt'}</span>
                   </button>
 
                   {isExpanded && (
                     <div className="bg-[#090A0F] border border-white/10 rounded-xl p-3 space-y-2.5">
+                      {/* 1. Camera Visual Composition (English, decoupled from spoken dialogue) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[10px] font-mono uppercase text-sky-400 block">
+                            Composición Visual en Cámara (Inglés):
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleReapplyAnchors(idx)}
+                            className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
+                            title="Re-inyectar las anclas de la Biblia Visual en este prompt técnico"
+                          >
+                            <Sparkles className="w-3 h-3" /> Re-inyectar Anclas
+                          </button>
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={scene.imagePrompt || ''}
+                          onChange={(e) =>
+                            onUpdateScene(idx, { imagePrompt: e.target.value })
+                          }
+                          placeholder="Cinematic camera composition in English (subject, lighting, action)..."
+                          className="w-full bg-[#11131C] border border-white/10 rounded-lg p-2 text-[11px] font-mono text-zinc-200"
+                        />
+                      </div>
+
+                      {/* 2. Positive Technical Prompt */}
                       <div>
                         <label className="text-[10px] font-mono uppercase text-emerald-400 block mb-1">
                           Positive Prompt (Coherente con {activeStyleProfile.name}):
@@ -810,6 +971,7 @@ export const VisualsStudioStep: React.FC<VisualsStudioStepProps> = ({
                         />
                       </div>
 
+                      {/* 3. Negative Technical Prompt */}
                       <div>
                         <label className="text-[10px] font-mono uppercase text-red-400 block mb-1">
                           Negative Prompt (Exclusiones de Estilo):
@@ -844,11 +1006,11 @@ export const VisualsStudioStep: React.FC<VisualsStudioStepProps> = ({
                 </div>
               </div>
 
-              <div className="p-4 pt-0">
+              <div className="p-4 pt-0 space-y-2">
                 <button
                   onClick={() => onGenerateSingleScene(idx)}
                   disabled={scene.isGeneratingImage}
-                  className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-violet-600 text-zinc-200 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-violet-600/20"
                 >
                   {comfyConfig.enabled ? (
                     <Cpu className="w-3.5 h-3.5" />
@@ -859,6 +1021,36 @@ export const VisualsStudioStep: React.FC<VisualsStudioStepProps> = ({
                     ? `Regenerar en ${comfyConfig.enabled ? 'ComfyUI / Cloud' : 'Cloud'}`
                     : `Renderizar Escena #${idx + 1}`}
                 </button>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleAcquireBroll(idx)}
+                    disabled={loadingBrollIndex === idx || scene.isGeneratingImage}
+                    className="py-1.5 px-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white text-[11px] font-medium flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Film
+                      className={`w-3 h-3 ${loadingBrollIndex === idx ? 'animate-spin text-emerald-400' : 'text-zinc-400'}`}
+                    />
+                    {loadingBrollIndex === idx ? 'Buscando...' : 'Stock B-Roll'}
+                  </button>
+
+                  <label className="py-1.5 px-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white text-[11px] font-medium flex items-center justify-center gap-1.5 cursor-pointer">
+                    <Upload
+                      className={`w-3 h-3 ${uploadingIndex === idx ? 'animate-spin text-violet-400' : 'text-zinc-400'}`}
+                    />
+                    <span>{uploadingIndex === idx ? 'Subiendo...' : 'Subir Archivo'}</span>
+                    <input
+                      type="file"
+                      accept="image/*,video/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleCustomFileUpload(idx, f);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
             </div>
           );
